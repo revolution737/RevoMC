@@ -33,6 +33,5 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
-    windowed=True,
-    icon=None,
+    manifest='revomc.manifest',
 )

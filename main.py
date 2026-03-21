@@ -1,35 +1,33 @@
-"""
-main.py — Entry point for RevoMC
-Run with: python main.py
-"""
-
-import ctypes
+import sys
 import os
 
-# Force Nvidia high performance GPU on Windows
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# Hide console window on Windows immediately
+if sys.platform == "win32":
+    import ctypes
 
-try:
-    # Tell Nvidia driver to use high performance GPU for this process
-    ctypes.windll.nvapi.NvAPI_Initialize()
-except Exception:
-    pass
+    ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
 
-try:
-    # AMD equivalent
-    ctypes.windll.aticfx64.AtiPowerXpressRequestHighPerformance()
-except Exception:
-    pass
-
-import sys
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import MainWindow
 
+# Request high performance GPU (Nvidia Optimus / AMD switchable graphics)
+if sys.platform == "win32":
+    try:
+        import ctypes
+
+        # Nvidia
+        ctypes.windll.LoadLibrary("NvOptimusEnablement")
+    except Exception:
+        pass
+    try:
+        # AMD
+        ctypes.windll.LoadLibrary("AmdPowerXpressRequestHighPerformance")
+    except Exception:
+        pass
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("RevoMC")
-
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
