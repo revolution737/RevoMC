@@ -37,4 +37,4 @@ jobs:
         with:
           files: RevoMC-windows.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_RELEASE_TOKEN }}
