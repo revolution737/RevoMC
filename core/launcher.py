@@ -15,17 +15,11 @@ from core.installer import get_launcher_dir, get_mods_dir
 from core.config import get_minecraft_dir
 
 
+from core.java_manager import get_java_executable
+
+
 def _find_java() -> str:
-    java_home = os.environ.get("JAVA_HOME")
-    if java_home:
-        candidate = (
-            Path(java_home)
-            / "bin"
-            / ("java.exe" if platform.system() == "Windows" else "java")
-        )
-        if candidate.exists():
-            return str(candidate)
-    return "java"
+    return get_java_executable()
 
 
 def _maven_path(name: str) -> str:

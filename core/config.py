@@ -6,7 +6,7 @@ import json
 import platform
 from pathlib import Path
 
-CONFIG_PATH = Path.home() / ".RevoMC" / "config.json"
+CONFIG_PATH = Path.home() / ".revomc" / "config.json"
 
 
 def get_minecraft_dir() -> Path:

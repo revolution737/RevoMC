@@ -295,7 +295,15 @@ class MainWindow(QMainWindow):
         self._thread = None
         self._worker = None
         self._setup_ui()
+        self._check_java()
         self._load_versions()
+
+    def _check_java(self):
+        from core.java_manager import is_runtime_installed
+        if not is_runtime_installed():
+            self._log("⚠  Java runtime not found — it will be downloaded automatically when you click Install.")
+        else:
+            self._log("✅ Java runtime ready.")
 
     def _setup_ui(self):
         self.setWindowTitle("RevoMC")
@@ -546,6 +554,8 @@ class MainWindow(QMainWindow):
         self._log(f"📦 Installing '{profile['name']}' ({mc_version}, {profile_type})…")
 
         def install_task(log, progress):
+            from core.java_manager import install_java
+            install_java(log, progress)
             install_minecraft(mc_version, log, progress)
             fabric_profile_id = None
             if profile_type == "fabric":
