@@ -1,0 +1,38 @@
+name: Build RevoMC
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install PyQt6 pyinstaller
+
+      - name: Build exe
+        run: |
+          pyinstaller revomc.spec
+
+      - name: Zip the exe
+        run: |
+          Compress-Archive -Path dist/RevoMC.exe -DestinationPath RevoMC-windows.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RevoMC-windows.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
