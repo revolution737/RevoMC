@@ -33,6 +33,6 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
-    windowed=true,
+    windowed=True,
     icon=None,
 )
