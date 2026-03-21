@@ -95,8 +95,6 @@ All game files are stored in `~/.revomc/` and your worlds/saves live in the stan
 ## Notes
 
 - **This uses offline auth** (no Microsoft login). You need a legitimate Minecraft account to play on online-mode servers. For offline/LAN play it works fine as-is.
-- To add **Microsoft OAuth**, look into the `msal` Python library and swap the placeholder tokens in `core/launcher.py`.
-- To add **more mods**, add their Modrinth project IDs to `AVAILABLE_MODS` in `core/installer.py`.
 
 ---
 
