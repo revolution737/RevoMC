@@ -2,6 +2,7 @@
 
 A custom, lightweight Minecraft Java launcher that auto-installs **Sodium**, **Iris Shaders**, **Lithium** and **FerriteCore** so you never have to hunt for mods manually again. Optimised for low end computers and gamers trying to squeeze the maximum performance out of the game with minimal setup.
 
+RevoMC is simply as good as vanilla Minecraft gets.
 ---
 
 ## Features
