@@ -33,7 +33,7 @@ if sys.platform == 'darwin':
         name='RevoMC',
         debug=False,
         strip=False,
-        upx=True,
+        upx=False,
         console=False,
         windowed=True,
     )
@@ -42,7 +42,7 @@ if sys.platform == 'darwin':
         a.binaries,
         a.datas,
         strip=False,
-        upx=True,
+        upx=False,
         name='RevoMC',
     )
     app = BUNDLE(
@@ -66,3 +66,10 @@ else:
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,
+        windowed=True,
+        disable_windowed_traceback=True,
+        icon=None,
+    )
