@@ -1,10 +1,11 @@
 import sys
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
+    binaries=collect_dynamic_libs('PyQt6'),
+    datas=collect_data_files('PyQt6'),
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
@@ -51,6 +52,8 @@ if sys.platform == 'darwin':
         bundle_identifier='com.revomc.launcher',
         info_plist={
             'NSHighResolutionCapable': True,
+            'NSPrincipalClass': 'NSApplication',
+            'NSAppleScriptEnabled': False,
             'CFBundleShortVersionString': '1.0.0',
         },
     )
