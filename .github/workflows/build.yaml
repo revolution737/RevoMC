@@ -38,3 +38,34 @@ jobs:
           files: RevoMC-windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_RELEASE_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install PyQt6 pyinstaller
+
+      - name: Build app
+        run: |
+          pyinstaller revomc.spec
+
+      - name: Zip the app
+        run: |
+          cd dist
+          zip -r ../RevoMC-macos.zip RevoMC.app
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RevoMC-macos.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_RELEASE_TOKEN }}

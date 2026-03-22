@@ -1,3 +1,5 @@
+import sys
+
 a = Analysis(
     ['main.py'],
     pathex=[],
@@ -22,21 +24,45 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
-    name='RevoMC',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,
-    windowed=True,
-    disable_windowed_traceback=True,
-    icon=None,
-)
+if sys.platform == 'darwin':
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='RevoMC',
+        debug=False,
+        strip=False,
+        upx=True,
+        console=False,
+        windowed=True,
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        name='RevoMC',
+    )
+    app = BUNDLE(
+        coll,
+        name='RevoMC.app',
+        bundle_identifier='com.revomc.launcher',
+        info_plist={
+            'NSHighResolutionCapable': True,
+            'CFBundleShortVersionString': '1.0.0',
+        },
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name='RevoMC',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
