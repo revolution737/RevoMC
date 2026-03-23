@@ -3,6 +3,14 @@ core/installer.py
 Handles downloading Minecraft, Fabric loader, and mods from Modrinth.
 """
 
+import ssl
+import certifi
+
+# Fix SSL certificate verification on macOS
+ssl._create_default_https_context = ssl.create_default_context
+ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
+
+
 import json
 import hashlib
 import platform
@@ -153,6 +161,42 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
         list(executor.map(download_lib, to_download))
     log("✅ Libraries ready.")
 
+    # Download and extract natives for this platform
+    log("📦 Extracting native libraries…")
+    natives_dir = version_dir / "natives"
+    natives_dir.mkdir(exist_ok=True)
+    import zipfile
+
+    sys_classifier = {
+        "windows": "natives-windows",
+        "darwin": "natives-macos",
+        "linux": "natives-linux",
+    }.get(sys_name, "natives-linux")
+
+    for lib in version_json.get("libraries", []):
+        classifiers = lib.get("downloads", {}).get("classifiers", {})
+        # Try exact match first, then arm64 variant
+        native = (
+            classifiers.get(sys_classifier)
+            or classifiers.get(sys_classifier + "-arm64")
+            or classifiers.get(sys_classifier.replace("macos", "osx"))
+        )
+        if not native:
+            continue
+        native_jar = libs_dir / native["path"]
+        if not native_jar.exists():
+            _download(native["url"], native_jar)
+        # Extract into natives dir
+        try:
+            with zipfile.ZipFile(native_jar, "r") as z:
+                for name in z.namelist():
+                    if not name.startswith("META-INF") and not name.endswith("/"):
+                        z.extract(name, natives_dir)
+        except Exception:
+            pass
+
+    log("✅ Natives ready.")
+    
     # Asset index
     asset_index = version_json["assetIndex"]
     idx_dir = base / "assets" / "indexes"
