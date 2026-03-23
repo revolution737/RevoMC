@@ -1,8 +1,13 @@
 import sys
 import os
 
-from PyQt6.QtWidgets import QApplication
+if sys.platform == "darwin":
+    from PySide6.QtWidgets import QApplication
+else:
+    from PyQt6.QtWidgets import QApplication
+
 from ui.main_window import MainWindow
+
 
 def main():
     app = QApplication(sys.argv)

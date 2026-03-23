@@ -1,31 +1,55 @@
-"""
-ui/main_window.py
-"""
+import sys
 
-from PyQt6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QProgressBar,
-    QTextEdit,
-    QSlider,
-    QFrame,
-    QDialog,
-    QDialogButtonBox,
-    QRadioButton,
-    QButtonGroup,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QCheckBox,
-    QApplication,
-    QScrollArea,
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
+if sys.platform == "darwin":
+    from PySide6.QtWidgets import (
+        QMainWindow,
+        QWidget,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QPushButton,
+        QProgressBar,
+        QTextEdit,
+        QSlider,
+        QFrame,
+        QDialog,
+        QDialogButtonBox,
+        QRadioButton,
+        QButtonGroup,
+        QListWidget,
+        QListWidgetItem,
+        QMessageBox,
+        QCheckBox,
+        QApplication,
+        QScrollArea,
+    )
+    from PySide6.QtCore import Qt, QThread, Signal as pyqtSignal, QObject
+else:
+    from PyQt6.QtWidgets import (
+        QMainWindow,
+        QWidget,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QLineEdit,
+        QPushButton,
+        QProgressBar,
+        QTextEdit,
+        QSlider,
+        QFrame,
+        QDialog,
+        QDialogButtonBox,
+        QRadioButton,
+        QButtonGroup,
+        QListWidget,
+        QListWidgetItem,
+        QMessageBox,
+        QCheckBox,
+        QApplication,
+        QScrollArea,
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 
 import core.config as config
 from core.installer import (

@@ -52,7 +52,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install PyQt6 pyinstaller
+          pip install PySide6 pyinstaller
 
       - name: Build app
         run: |

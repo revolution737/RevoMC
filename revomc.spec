@@ -1,15 +1,22 @@
 import sys
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
-extra_binaries = collect_dynamic_libs('PyQt6') if sys.platform == 'darwin' else []
-extra_datas = collect_data_files('PyQt6') if sys.platform == 'darwin' else []
-
-a = Analysis(
-    ['main.py'],
-    pathex=[],
-    binaries=extra_binaries,
-    datas=extra_datas,
-    hiddenimports=[
+if sys.platform == 'darwin':
+    extra_binaries = collect_dynamic_libs('PySide6')
+    extra_datas = collect_data_files('PySide6')
+    hidden = [
+        'PySide6.QtCore',
+        'PySide6.QtGui',
+        'PySide6.QtWidgets',
+        'core.installer',
+        'core.launcher',
+        'core.config',
+        'core.java_manager',
+    ]
+else:
+    extra_binaries = []
+    extra_datas = []
+    hidden = [
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
@@ -17,7 +24,14 @@ a = Analysis(
         'core.launcher',
         'core.config',
         'core.java_manager',
-    ],
+    ]
+
+a = Analysis(
+    ['main.py'],
+    pathex=[],
+    binaries=extra_binaries,
+    datas=extra_datas,
+    hiddenimports=hidden,
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
