@@ -1,11 +1,14 @@
 import sys
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
+extra_binaries = collect_dynamic_libs('PyQt6') if sys.platform == 'darwin' else []
+extra_datas = collect_data_files('PyQt6') if sys.platform == 'darwin' else []
+
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=collect_dynamic_libs('PyQt6'),
-    datas=collect_data_files('PyQt6'),
+    binaries=extra_binaries,
+    datas=extra_datas,
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui',
