@@ -114,6 +114,42 @@ def fetch_fabric_versions() -> list[str]:
 # ── Install routines ──────────────────────────────────────────────────────────
 
 
+def _extract_natives(version_json: dict, base: Path, mc_version: str, log: Callable):
+    import zipfile
+
+    natives_dir = base / "versions" / mc_version / "natives"
+    natives_dir.mkdir(parents=True, exist_ok=True)
+    libs_dir = base / "libraries"
+    sys_name = platform.system().lower()
+    native_key = {
+        "darwin": "natives-macos",
+        "windows": "natives-windows",
+        "linux": "natives-linux",
+    }.get(sys_name)
+    if not native_key:
+        return
+    extracted = 0
+    for lib in version_json.get("libraries", []):
+        if "natives" not in lib:
+            continue
+        classifiers = lib.get("downloads", {}).get("classifiers", {})
+        if native_key not in classifiers:
+            continue
+        native_info = classifiers[native_key]
+        jar_path = libs_dir / native_info["path"]
+        if not jar_path.exists():
+            _download(native_info["url"], jar_path)
+        try:
+            with zipfile.ZipFile(jar_path, "r") as z:
+                for file in z.namelist():
+                    if not file.startswith("META-INF") and not file.endswith("/"):
+                        z.extract(file, natives_dir)
+            extracted += 1
+        except Exception as e:
+            log(f"⚠  Failed extracting {jar_path.name}: {e}")
+    log(f"✅ Natives extracted ({extracted} libraries).")
+
+
 def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dict:
     base = get_launcher_dir()
     manifest = _get(VERSION_MANIFEST)
@@ -217,6 +253,8 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
             list(executor.map(download_asset, missing.items()))
 
     log(f"✅ Assets ready ({len(objects)} files).")
+    log("🧩 Extracting native libraries…")
+    _extract_natives(version_json, base, mc_version, log)
     return version_json
 
 

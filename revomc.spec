@@ -1,9 +1,28 @@
 import sys
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
 
 if sys.platform == 'darwin':
+    from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
     extra_binaries = collect_dynamic_libs('PySide6')
-    extra_datas = collect_data_files('PySide6')
+    extra_datas = collect_data_files('PySide6',
+        excludes=[
+            'PySide6/Qt/lib/QtWebEngine*',
+            'PySide6/Qt/lib/QtWebView*',
+            'PySide6/Qt/lib/QtQuick*',
+            'PySide6/Qt/lib/QtQml*',
+            'PySide6/Qt/lib/Qt3D*',
+            'PySide6/Qt/lib/QtMultimedia*',
+            'PySide6/Qt/lib/QtSql*',
+            'PySide6/Qt/lib/QtBluetooth*',
+            'PySide6/Qt/lib/QtLocation*',
+            'PySide6/Qt/lib/QtNfc*',
+            'PySide6/Qt/lib/QtSensors*',
+            'PySide6/Qt/lib/QtTest*',
+            'PySide6/Qt/lib/QtPdf*',
+            'PySide6/Qt/lib/QtCharts*',
+            'PySide6/Qt/lib/QtDataVisualization*',
+            'PySide6/Qt/translations',
+        ]
+    )
     hidden = [
         'PySide6.QtCore',
         'PySide6.QtGui',

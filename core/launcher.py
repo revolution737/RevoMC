@@ -190,14 +190,20 @@ def launch(
             "legacy",
         ]
 
+    natives_path = base / "versions" / mc_version / "natives"
+
+    extra_mac = ["-XstartOnFirstThread"] if platform.system() == "Darwin" else []
+
     cmd = [
         java,
+        *extra_mac,
         f"-Xmx{ram_gb}G",
         f"-Xms{max(1, ram_gb // 2)}G",
         "-XX:+UseG1GC",
         "-XX:+ParallelRefProcEnabled",
         "-XX:MaxGCPauseMillis=200",
-        f"-Djava.library.path={base / 'versions' / mc_version / 'natives'}",
+        f"-Djava.library.path={natives_path}",
+        f"-Djna.tmpdir={natives_path}",
         *extra_jvm,
         "-cp",
         classpath,
