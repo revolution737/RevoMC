@@ -8,21 +8,21 @@ import certifi
 
 # Fix SSL certificate verification on macOS
 ssl._create_default_https_context = ssl.create_default_context
-ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
-
+ssl._create_default_https_context = lambda: ssl.create_default_context(
+    cafile=certifi.where()
+)
 
 import json
 import hashlib
 import platform
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Optional
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 
 # ── Mod registry ─────────────────────────────────────────────────────────────
-# fabric-api is always installed silently when type is fabric
-# These are the user-toggleable mods
 AVAILABLE_MODS = {
     "sodium": {
         "id": "AANobbMI",
@@ -57,18 +57,31 @@ def _get(url: str) -> dict:
         return json.loads(r.read())
 
 
-def _download(url: str, dest: Path, progress: Optional[Callable] = None) -> None:
+def _download(
+    url: str, dest: Path, progress: Optional[Callable] = None, retries: int = 3
+) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "RevoMC/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        total = int(r.headers.get("Content-Length", 0))
-        downloaded = 0
-        with open(dest, "wb") as f:
-            while chunk := r.read(65536):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if progress and total:
-                    progress(int(downloaded / total * 100))
+    last_error = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "RevoMC/1.0"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                total = int(r.headers.get("Content-Length", 0))
+                downloaded = 0
+                with open(dest, "wb") as f:
+                    while chunk := r.read(65536):
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if progress and total:
+                            progress(int(downloaded / total * 100))
+            return
+        except Exception as e:
+            last_error = e
+            if dest.exists():
+                dest.unlink()
+            if attempt < retries - 1:
+                time.sleep(2**attempt)
+    raise last_error
 
 
 def get_launcher_dir() -> Path:
@@ -160,47 +173,6 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
     with ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(download_lib, to_download))
     log("✅ Libraries ready.")
-
-    # Download and extract natives for this platform
-    # Download and extract natives for this platform
-    log("📦 Extracting native libraries…")
-    natives_dir = version_dir / "natives"
-    natives_dir.mkdir(exist_ok=True)
-    import zipfile
-
-    _sys_name = platform.system().lower()
-    sys_classifier = {
-        "windows": "natives-windows",
-        "darwin": "natives-macos",
-        "linux": "natives-linux",
-    }.get(_sys_name, "natives-linux")
-
-    log(f"   Platform: {_sys_name}, classifier: {sys_classifier}")
-    natives_found = 0
-
-    for lib in version_json.get("libraries", []):
-        classifiers = lib.get("downloads", {}).get("classifiers", {})
-        native = (
-            classifiers.get(sys_classifier)
-            or classifiers.get(sys_classifier + "-arm64")
-            or classifiers.get(sys_classifier.replace("macos", "osx"))
-        )
-        if not native:
-            continue
-        natives_found += 1
-        native_jar = libs_dir / native["path"]
-        if not native_jar.exists():
-            log(f"   ⬇  Downloading native: {native['path']}")
-            _download(native["url"], native_jar)
-        try:
-            with zipfile.ZipFile(native_jar, "r") as z:
-                for name in z.namelist():
-                    if not name.startswith("META-INF") and not name.endswith("/"):
-                        z.extract(name, natives_dir)
-        except Exception as e:
-            log(f"   ⚠  Failed to extract: {e}")
-
-    log(f"✅ Natives ready ({natives_found} found).")
 
     # Asset index
     asset_index = version_json["assetIndex"]
@@ -328,13 +300,11 @@ def install_mods(
     mods_dir = get_mods_dir(mc_version)
     mods_dir.mkdir(parents=True, exist_ok=True)
 
-    # Clear old jars
     for f in mods_dir.glob("*.jar"):
         f.unlink()
 
     installed = []
 
-    # Always install Fabric API first
     log("🔍 Resolving fabric-api…")
     try:
         installed += _install_single_mod(
@@ -343,7 +313,6 @@ def install_mods(
     except Exception as e:
         log(f"❌ Failed to install fabric-api: {e}")
 
-    # Install user-selected mods
     total = len(enabled_mods)
     for i, mod_key in enumerate(enabled_mods):
         if mod_key not in AVAILABLE_MODS:
