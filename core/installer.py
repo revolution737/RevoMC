@@ -162,20 +162,24 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
     log("✅ Libraries ready.")
 
     # Download and extract natives for this platform
+    # Download and extract natives for this platform
     log("📦 Extracting native libraries…")
     natives_dir = version_dir / "natives"
     natives_dir.mkdir(exist_ok=True)
     import zipfile
 
+    _sys_name = platform.system().lower()
     sys_classifier = {
         "windows": "natives-windows",
         "darwin": "natives-macos",
         "linux": "natives-linux",
-    }.get(sys_name, "natives-linux")
+    }.get(_sys_name, "natives-linux")
+
+    log(f"   Platform: {_sys_name}, classifier: {sys_classifier}")
+    natives_found = 0
 
     for lib in version_json.get("libraries", []):
         classifiers = lib.get("downloads", {}).get("classifiers", {})
-        # Try exact match first, then arm64 variant
         native = (
             classifiers.get(sys_classifier)
             or classifiers.get(sys_classifier + "-arm64")
@@ -183,20 +187,21 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
         )
         if not native:
             continue
+        natives_found += 1
         native_jar = libs_dir / native["path"]
         if not native_jar.exists():
+            log(f"   ⬇  Downloading native: {native['path']}")
             _download(native["url"], native_jar)
-        # Extract into natives dir
         try:
             with zipfile.ZipFile(native_jar, "r") as z:
                 for name in z.namelist():
                     if not name.startswith("META-INF") and not name.endswith("/"):
                         z.extract(name, natives_dir)
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"   ⚠  Failed to extract: {e}")
 
-    log("✅ Natives ready.")
-    
+    log(f"✅ Natives ready ({natives_found} found).")
+
     # Asset index
     asset_index = version_json["assetIndex"]
     idx_dir = base / "assets" / "indexes"
