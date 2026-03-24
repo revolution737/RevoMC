@@ -31,7 +31,7 @@ RevoMC is simply as good as vanilla Minecraft gets.
 Grab the latest release for your platform from the [Releases](https://github.com/revolution737/RevoMC/releases) page — no Python or Java install required, just download and run.
 
 - **Windows** — download `RevoMC-windows.zip`, extract, run `RevoMC.exe`
-- **macOS** — download `RevoMC-macos.zip`, extract, run `RevoMC.app`
+- **macOS** — download `RevoMC-macos.zip`, extract, run `RevoMC.app` (Currently, the game doesn't launch on macOS, support will be fixed soon)
 
 ---
 
