@@ -1,2 +1,2 @@
-PyQt6>=6.6.0
+customtkinter>=5.2.0
 certifi
