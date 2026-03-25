@@ -43,6 +43,7 @@ else:
         'core.launcher',
         'core.config',
         'core.java_manager',
+        'certifi'
     ]
 
 a = Analysis(

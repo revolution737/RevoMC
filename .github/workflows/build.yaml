@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install PyQt6 pyinstaller
+          pip install PyQt6 pyinstaller certifi
 
       - name: Build exe
         run: |
@@ -52,7 +52,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install PySide6 pyinstaller
+          pip install PySide6 pyinstaller certifi
 
       - name: Build app
         run: |
