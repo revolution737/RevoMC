@@ -1,7 +1,8 @@
 import sys
+from PyInstaller.utils.hooks import collect_data_files
 
 if sys.platform == 'darwin':
-    from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
+    from PyInstaller.utils.hooks import collect_dynamic_libs
     extra_binaries = collect_dynamic_libs('PySide6')
     extra_datas = collect_data_files('PySide6',
         excludes=[
@@ -34,16 +35,15 @@ if sys.platform == 'darwin':
     ]
 else:
     extra_binaries = []
-    extra_datas = []
+    extra_datas = collect_data_files('customtkinter')
     hidden = [
-        'PyQt6.QtCore',
-        'PyQt6.QtGui',
-        'PyQt6.QtWidgets',
+        'customtkinter',
         'core.installer',
         'core.launcher',
         'core.config',
         'core.java_manager',
-        'certifi'
+        'certifi',
+        'PIL',
     ]
 
 a = Analysis(

@@ -29,3 +29,6 @@ Thumbs.db
 
 #PAT
 pat.txt
+
+#Build tester
+build_windows.bat
