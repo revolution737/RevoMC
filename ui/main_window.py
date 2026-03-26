@@ -64,9 +64,10 @@ class NewProfileDialog(ctk.CTkToplevel):
         self.minsize(460, 480)
         # Make modal
         self.transient(parent)
-        self.grab_set()
 
         self._build()
+        self.update_idletasks()
+        self.after(200, self.grab_set)
         self.wait_window(self)  # blocks until dialog closes
 
     # ── Dialog UI ─────────────────────────────────────────────────────────────
