@@ -352,7 +352,7 @@ class MainWindow(ctk.CTk):
         self.log_box = ctk.CTkTextbox(
             right, state="disabled",
             fg_color=BG_CONSOLE, border_color=BORDER_COL, border_width=1,
-            font=ctk.CTkFont(family="Consolas", size=11),
+            font=ctk.CTkFont(family="monospace", size=11),
             text_color="#a0aec0",
         )
         self.log_box.pack(fill="both", expand=True, pady=(0, 8))

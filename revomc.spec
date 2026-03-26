@@ -36,6 +36,11 @@ if sys.platform == 'darwin':
                      'NSAppleScriptEnabled': False,
                      'CFBundleShortVersionString': '1.0.7',
                  })
+elif sys.platform.startswith('linux'):
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True,
+              name='RevoMC', debug=False, strip=True, upx=False,
+              console=False)
+    coll = COLLECT(exe, a.binaries, a.datas, strip=True, upx=False, name='RevoMC')
 else:
     exe = EXE(pyz, a.scripts, a.binaries, a.datas, [],
               name='RevoMC', debug=False, strip=False, upx=True,

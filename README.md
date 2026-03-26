@@ -22,7 +22,7 @@ RevoMC is simply as good as vanilla Minecraft gets.
 - 🟢 Automatic retry on failed downloads
 - 🟢 Configurable RAM allocation
 - 🟢 Console log so you can see exactly what's happening
-- 🟢 Available for Windows and macOS
+- 🟢 Available for Windows, macOS, and Linux
 
 ---
 
@@ -32,6 +32,7 @@ Grab the latest release for your platform from the [Releases](https://github.com
 
 - **Windows** — download `RevoMC-windows.zip`, extract, run `RevoMC.exe`
 - **macOS** — download `RevoMC-macos.zip`, extract, run `RevoMC.app` (Currently, the game doesn't launch on macOS, support will be fixed soon)
+- **Linux** — download `RevoMC-linux.zip`, extract, run `./RevoMC/RevoMC`
 
 ---
 
@@ -53,6 +54,10 @@ If you'd prefer to run from source instead of the pre-built executable:
 # 1. Clone the repo
 git clone https://github.com/revolution737/RevoMC.git
 cd RevoMC
+
+# Linux only — tkinter is not bundled with system Python
+# Fedora:  sudo dnf install python3-tkinter
+# Ubuntu:  sudo apt install python3-tk
 
 # 2. Install Python dependencies (Python 3.11+ required)
 pip install -r requirements.txt
@@ -132,4 +137,5 @@ All game files are stored in `~/.revomc/` and your worlds/saves live in the stan
 | Game crashes on launch | Check the console — usually a missing native or wrong Java version |
 | Mod not found for version | That mod hasn't released for that MC version yet — try a slightly older version |
 | Black screen | Make sure your GPU drivers are up to date (Sodium uses OpenGL) |
+| Linux: `ModuleNotFoundError: _tkinter` | Install tkinter: `sudo dnf install python3-tkinter` (Fedora) or `sudo apt install python3-tk` (Ubuntu) |
 | macOS: app won't open | Go to System Settings → Privacy & Security → Open Anyway |

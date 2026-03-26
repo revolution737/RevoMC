@@ -218,15 +218,15 @@ def launch(
     log(f"   Game dir:   {game_dir}")
     log(f"   RAM:        {ram_gb}GB")
 
-    import subprocess
-
-    CREATE_NO_WINDOW = 0x08000000
-
-    return subprocess.Popen(
-        cmd,
+    popen_kwargs = dict(
         cwd=str(game_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        creationflags=CREATE_NO_WINDOW if __import__('platform').system() == "Windows" else 0,
     )
+
+    if platform.system() == "Windows":
+        CREATE_NO_WINDOW = 0x08000000
+        popen_kwargs["creationflags"] = CREATE_NO_WINDOW
+
+    return subprocess.Popen(cmd, **popen_kwargs)
