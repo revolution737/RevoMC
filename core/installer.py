@@ -12,6 +12,8 @@ ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
 )
 
+import os
+
 import json
 import hashlib
 import platform
@@ -86,6 +88,13 @@ def _download(
 
 def get_launcher_dir() -> Path:
     return Path.home() / ".revomc"
+
+
+def get_shared_assets_dir() -> Path:
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))
+        return Path(appdata) / ".minecraft" / "assets"
+    return Path.home() / ".minecraft" / "assets"
 
 
 def get_mods_dir(mc_version: str) -> Path:
@@ -212,7 +221,8 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
 
     # Asset index
     asset_index = version_json["assetIndex"]
-    idx_dir = base / "assets" / "indexes"
+    shared_assets_dir = get_shared_assets_dir()
+    idx_dir = shared_assets_dir / "indexes"
     idx_dir.mkdir(parents=True, exist_ok=True)
     idx_file = idx_dir / f"{asset_index['id']}.json"
     if not idx_file.exists():
@@ -222,33 +232,38 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
     # Assets
     log("🎨 Downloading assets…")
     objects = json.loads(idx_file.read_text())["objects"]
-    obj_dir = base / "assets" / "objects"
+    obj_dir = shared_assets_dir / "objects"
     missing = {
         name: info
         for name, info in objects.items()
         if not (obj_dir / info["hash"][:2] / info["hash"]).exists()
     }
-    log(
-        f"   {len(objects) - len(missing)}/{len(objects)} assets cached, downloading {len(missing)}…"
-    )
+    
+    if not missing:
+        log(f"✅ All {len(objects)} assets already cached, skipping download.")
+        progress("assets", 100)
+    else:
+        log(
+            f"   {len(objects) - len(missing)}/{len(objects)} assets cached, downloading {len(missing)}…"
+        )
 
-    done_count = [0]
-    lock = threading.Lock()
+        done_count = [0]
+        lock = threading.Lock()
 
-    def download_asset(item):
-        name, info = item
-        h = info["hash"]
-        dest = obj_dir / h[:2] / h
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if not dest.exists():
-            _download(f"https://resources.download.minecraft.net/{h[:2]}/{h}", dest)
-        with lock:
-            done_count[0] += 1
-            if done_count[0] % 100 == 0:
-                log(f"   …{done_count[0]}/{len(missing)} assets")
-            progress("assets", int(done_count[0] / max(len(missing), 1) * 100))
+        def download_asset(item):
+            name, info = item
+            h = info["hash"]
+            dest = obj_dir / h[:2] / h
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                _download(f"https://resources.download.minecraft.net/{h[:2]}/{h}", dest)
+            with lock:
+                done_count[0] += 1
+                if done_count[0] % 100 == 0:
+                    log(f"   …{done_count[0]}/{len(missing)} assets")
+                progress("assets", int(done_count[0] / max(len(missing), 1) * 100))
 
-    if missing:
+        if missing:
         with ThreadPoolExecutor(max_workers=16) as executor:
             list(executor.map(download_asset, missing.items()))
 

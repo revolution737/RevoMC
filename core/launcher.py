@@ -11,7 +11,7 @@ import platform
 from pathlib import Path
 from typing import Callable
 
-from core.installer import get_launcher_dir, get_mods_dir
+from core.installer import get_launcher_dir, get_mods_dir, get_shared_assets_dir
 from core.config import get_minecraft_dir
 
 
@@ -130,7 +130,7 @@ def launch(
 
     # Asset index
     asset_index_id = version_json["assetIndex"]["id"]
-    assets_dir = base / "assets"
+    assets_dir = get_shared_assets_dir()
 
     # JVM args from Fabric profile
     extra_jvm = []
