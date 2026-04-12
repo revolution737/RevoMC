@@ -74,14 +74,14 @@ python main.py
 ## First Time Use
 
 1. **Enter your username** (top-right field) — this is the in-game name shown to other players
-2. Click **+ New** to create a profile — pick a name, type (Vanilla or Fabric+Mods), version, and which mods to include
+2. Click on the default latest releases for fabric or vanilla or click on **+ New** to create a profile — pick a name, type (Vanilla or Fabric+Mods), version, and which mods to include
 3. **Adjust RAM** — 2–4 GB is fine for modded play
-4. Click **⬇ Install / Update** — this downloads:
+4. Click **⬇ Install & Play** — this downloads:
    - Java runtime (first time only, ~50 MB)
    - Minecraft client jar + libraries + assets (~300 MB first time)
    - Fabric loader (if Fabric profile)
    - Selected mods from Modrinth (if Fabric profile)
-5. Click **▶ PLAY** once install completes
+   - After all dowloads are complete, it launches the game.
 
 ---
 
@@ -109,12 +109,12 @@ RevoMC stores launcher data in `~/.revomc/` and shares game files with the stand
 └── mods/                 # Downloaded mods per MC version
     └── 1.21.1/
         ├── sodium-*.jar
-        ├── iris-*.jar
+        ├── iris-*.jar 
         ├── lithium-*.jar
         └── ferritecore-*.jar
 
-~/.minecraft/             # Shared with other Minecraft launchers — same as the official launcher
-├── assets/               # Game assets (sounds, textures) — shared across all launchers
+~/.minecraft/             # Standard .minecraft folder
+├── assets/               # Game assets (sounds, textures) — RevcMC will not download these if you already have Minecraft
 ├── saves/                # Your worlds
 ├── screenshots/
 ├── resourcepacks/
