@@ -3,6 +3,11 @@ ui/main_window.py  –  CustomTkinter UI for RevoMC
 All program logic is identical to the original PyQt6 version.
 """
 
+import os
+import platform
+import ctypes
+import struct
+import subprocess
 import threading
 import customtkinter as ctk
 from tkinter import messagebox
@@ -17,6 +22,7 @@ from core.installer import (
     AVAILABLE_MODS,
 )
 from core.launcher import launch
+from core.java_manager import get_required_java_version
 
 # ── Appearance ────────────────────────────────────────────────────────────────
 
@@ -39,6 +45,42 @@ TEXT_LABEL   = "#6b7280"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
+def _get_system_ram_gb() -> int:
+    """Detect total system RAM in GB. Returns at least 2."""
+    try:
+        system = platform.system()
+        if system == "Windows":
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(stat)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+            return max(2, int(stat.ullTotalPhys / (1024 ** 3)))
+        elif system == "Darwin":
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True)
+            return max(2, int(int(out.strip()) / (1024 ** 3)))
+        else:  # Linux
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        kb = int(line.split()[1])
+                        return max(2, int(kb / (1024 ** 2)))
+    except Exception:
+        pass
+    return 16  # safe fallback
+
+
 def _section_label(master, text: str) -> ctk.CTkLabel:
     return ctk.CTkLabel(
         master, text=text.upper(),
@@ -52,10 +94,12 @@ def _section_label(master, text: str) -> ctk.CTkLabel:
 class NewProfileDialog(ctk.CTkToplevel):
     """Modal dialog for creating a new profile.  Mirrors the original QDialog."""
 
-    def __init__(self, parent, all_versions: list[str], fabric_versions: list[str]):
+    def __init__(self, parent, all_versions: list[str], fabric_versions: list[str],
+                 existing_profile_names: set[str] | None = None):
         super().__init__(parent)
         self.all_versions    = all_versions
         self.fabric_versions = fabric_versions
+        self._existing_profile_names = existing_profile_names or set()
         self.result: dict | None = None
 
         self.title("New Profile")
@@ -181,7 +225,17 @@ class NewProfileDialog(ctk.CTkToplevel):
         profile_type = self.type_var.get()
         name = self.name_var.get().strip()
         if not name:
-            name = "Untitled Fabric" if profile_type == "fabric" else "Untitled Vanilla"
+            # Generate incremental unnamed profile name
+            existing_names = self._existing_profile_names
+            prefix = (
+                "Unnamed Fabric Installation"
+                if profile_type == "fabric"
+                else "Unnamed Vanilla Installation"
+            )
+            n = 1
+            while f"{prefix} {n}" in existing_names:
+                n += 1
+            name = f"{prefix} {n}"
         enabled_mods = (
             [k for k, v in self.mod_vars.items() if v.get()]
             if profile_type == "fabric"
@@ -214,11 +268,7 @@ class MainWindow(ctk.CTk):
     # ── Java check (same as original) ─────────────────────────────────────────
 
     def _check_java(self):
-        from core.java_manager import is_runtime_installed
-        if not is_runtime_installed():
-            self._log("⚠  Java runtime not found — it will be downloaded automatically when you click Install.")
-        else:
-            self._log("✅ Java runtime ready.")
+        self._log("☕ Java runtimes are downloaded on demand (Java 8 / 21 / 25).")
 
     # ── UI Construction ───────────────────────────────────────────────────────
 
@@ -324,10 +374,13 @@ class MainWindow(ctk.CTk):
         ram_row.pack(fill="x", pady=(0, 4))
         self.ram_label_lbl = _section_label(ram_row, f"RAM — {self.cfg.get('ram_gb', 2)} GB")
         self.ram_label_lbl.pack(side="left")
+        system_ram = _get_system_ram_gb()
         self.ram_var = ctk.IntVar(value=self.cfg.get("ram_gb", 2))
         self.ram_slider = ctk.CTkSlider(
-            left, from_=1, to=16, number_of_steps=15,
+            left, from_=1, to=system_ram, number_of_steps=max(1, system_ram - 1),
             variable=self.ram_var, command=self._on_ram_changed,
+            progress_color=GREEN, fg_color=BG_SECONDARY,
+            button_color=GREEN, button_hover_color=GREEN_DARK,
         )
         self.ram_slider.pack(fill="x", pady=(0, 10))
 
@@ -389,9 +442,54 @@ class MainWindow(ctk.CTk):
             except Exception as e:
                 self.after(0, lambda: self._log(f"❌ Could not fetch Fabric versions: {e}"))
 
+            self.after(0, self._maybe_create_default_profiles)
             self.after(0, self._refresh_buttons)
 
         threading.Thread(target=_task, daemon=True).start()
+
+    def _maybe_create_default_profiles(self):
+        """On first launch, auto-create two default profiles."""
+        if not self.cfg.get("first_run", True):
+            return
+        if self.cfg.get("profiles"):
+            # Already has profiles — not first run
+            self.cfg["first_run"] = False
+            config.save(self.cfg)
+            return
+
+        profiles_created = []
+
+        # 1. "Latest Release Vanilla" — latest MC version
+        if self.all_versions:
+            vanilla_profile = {
+                "name": "Latest Release Vanilla",
+                "mc_version": self.all_versions[0],
+                "type": "vanilla",
+                "mods": [],
+            }
+            profiles_created.append(vanilla_profile)
+
+        # 2. "Latest Release Fabric" — latest Fabric-supported version
+        if self.fabric_versions:
+            fabric_profile = {
+                "name": "Latest Release Fabric",
+                "mc_version": self.fabric_versions[0],
+                "type": "fabric",
+                "mods": list(AVAILABLE_MODS.keys()),
+            }
+            profiles_created.append(fabric_profile)
+
+        if profiles_created:
+            self.cfg.setdefault("profiles", []).extend(profiles_created)
+            self.cfg["active_profile"] = profiles_created[0]["name"]
+            self.cfg["first_run"] = False
+            config.save(self.cfg)
+            self._refresh_profile_list()
+            for p in profiles_created:
+                self._log(f"✅ Default profile created: '{p['name']}' ({p['mc_version']}, {p['type']})")
+        else:
+            self.cfg["first_run"] = False
+            config.save(self.cfg)
 
     # ── Profiles ──────────────────────────────────────────────────────────────
 
@@ -459,13 +557,15 @@ class MainWindow(ctk.CTk):
             labels = [AVAILABLE_MODS[m]["label"] for m in mods if m in AVAILABLE_MODS]
             self.info_mods_lbl.configure(text="Mods: " + (", ".join(labels) if labels else "none"))
         else:
-            self.info_mods_lbl.configure(text="No mods — pure vanilla")
+            self.info_mods_lbl.configure(text="No mods installed")
 
     def _on_new_profile(self):
         if not self.all_versions:
             self._log("⚠  Still loading versions, try again in a moment.")
             return
-        dlg = NewProfileDialog(self, self.all_versions, self.fabric_versions)
+        existing_names = {p["name"] for p in self.cfg.get("profiles", [])}
+        dlg = NewProfileDialog(self, self.all_versions, self.fabric_versions,
+                               existing_profile_names=existing_names)
         profile = dlg.result
         if not profile:
             return
@@ -535,7 +635,9 @@ class MainWindow(ctk.CTk):
                 # ── Install phase (skipped if already up-to-date) ──────────
                 if needs_install:
                     from core.java_manager import install_java
+                    java_ver = get_required_java_version(mc_version)
                     install_java(
+                        java_ver,
                         log=lambda m: self.after(0, lambda msg=m: self._log(msg)),
                         progress=lambda t, p: self.after(0, lambda tt=t, pp=p: self._on_progress(tt, pp)),
                     )

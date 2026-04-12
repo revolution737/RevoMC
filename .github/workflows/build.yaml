@@ -26,11 +26,11 @@ jobs:
 
       - name: Build exe
         run: |
-          pyinstaller revomc.spec
+          pyinstaller revomc.spec --distpath builds/
 
       - name: Zip the exe
         run: |
-          Compress-Archive -Path dist/RevoMC.exe -DestinationPath RevoMC-windows.zip
+          Compress-Archive -Path builds/RevoMC.exe -DestinationPath RevoMC-windows.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -56,11 +56,11 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller revomc.spec
+          pyinstaller revomc.spec --distpath builds/
 
       - name: Zip the app
         run: |
-          cd dist
+          cd builds
           zip -r ../RevoMC-macos.zip RevoMC.app
 
       - name: Create GitHub Release
@@ -92,11 +92,11 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller revomc.spec
+          pyinstaller revomc.spec --distpath builds/
 
       - name: Zip the app
         run: |
-          cd dist
+          cd builds
           zip -r ../RevoMC-linux.zip RevoMC/
 
       - name: Create GitHub Release

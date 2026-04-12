@@ -1,7 +1,8 @@
 """
 core/java_manager.py
-Downloads and manages a bundled JRE so the user never needs Java installed.
-Uses Adoptium (Eclipse Temurin) Java 21 LTS.
+Downloads and manages bundled JREs so the user never needs Java installed.
+Supports Java 8 (MC ≤1.16), Java 21 (MC 1.17–1.21.3), Java 25 (MC 1.21.4+).
+Uses Adoptium (Eclipse Temurin) releases.
 """
 
 import json
@@ -16,13 +17,53 @@ from typing import Callable, Optional
 
 from core.installer import get_launcher_dir
 
-JAVA_VERSION = 21  # LTS
 ADOPTIUM_API = "https://api.adoptium.net/v3"
-RUNTIME_DIR_NAME = "runtime"
 
 
-def get_runtime_dir() -> Path:
-    return get_launcher_dir() / RUNTIME_DIR_NAME
+# ── Version mapping ───────────────────────────────────────────────────────────
+
+
+def _parse_mc_version(mc_version: str) -> tuple[int, ...]:
+    """Parse a Minecraft version string like '1.21.4' into a tuple of ints."""
+    parts = []
+    for p in mc_version.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            break
+    # Pad to at least 3 components: "1.21" → (1, 21, 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
+def get_required_java_version(mc_version: str) -> int:
+    """
+    Determine which Java version a Minecraft version requires.
+      - MC 1.16.x and below  → Java 8
+      - MC 1.17 – 1.21.3     → Java 21
+      - MC 1.21.4+ and 26.x+ → Java 25
+    """
+    v = _parse_mc_version(mc_version)
+
+    # 1.16.x and below → Java 8
+    if v < (1, 17, 0):
+        return 8
+
+    # 1.17 through 1.21.3 → Java 21
+    if v <= (1, 21, 3):
+        return 21
+
+    # 1.21.4+ and everything 26.x+ → Java 25
+    return 25
+
+
+# ── Runtime paths ─────────────────────────────────────────────────────────────
+
+
+def get_runtime_dir(java_version: int) -> Path:
+    """Returns ~/.revomc/runtime-{java_version}/"""
+    return get_launcher_dir() / f"runtime-{java_version}"
 
 
 def _detect_os_arch() -> tuple[str, str]:
@@ -61,61 +102,70 @@ def find_java_executable(runtime_dir: Path) -> Optional[Path]:
     return None
 
 
-def get_java_executable() -> str:
+def get_java_executable(java_version: int) -> str:
     """
-    Returns path to bundled java executable.
+    Returns path to bundled java executable for the given version.
     Falls back to system 'java' if bundled not found (shouldn't happen after install).
     """
-    runtime_dir = get_runtime_dir()
+    runtime_dir = get_runtime_dir(java_version)
     exe = find_java_executable(runtime_dir)
     if exe and exe.exists():
         return str(exe)
     return "java"  # last resort fallback
 
 
-def is_runtime_installed() -> bool:
-    exe = find_java_executable(get_runtime_dir())
+def is_runtime_installed(java_version: int) -> bool:
+    """Check whether the given Java version is already downloaded and ready."""
+    exe = find_java_executable(get_runtime_dir(java_version))
     return exe is not None and exe.exists()
 
 
-def install_java(log: Callable, progress: Callable) -> None:
+def install_java(java_version: int, log: Callable, progress: Callable) -> None:
     """
-    Download and extract Java 21 JRE from Adoptium into ~/.revomc/runtime/.
+    Download and extract the requested Java JRE from Adoptium.
+    Stores into ~/.revomc/runtime-{java_version}/.
     Safe to call multiple times — skips if already installed.
     """
-    if is_runtime_installed():
-        log("✅ Java runtime already installed.")
+    if is_runtime_installed(java_version):
+        log(f"✅ Java {java_version} runtime already installed.")
         return
 
     os_name, arch = _detect_os_arch()
-    runtime_dir = get_runtime_dir()
+    runtime_dir = get_runtime_dir(java_version)
     runtime_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"🔍 Fetching Java {JAVA_VERSION} download info ({os_name}/{arch})…")
+    log(f"🔍 Fetching Java {java_version} download info ({os_name}/{arch})…")
 
-    # Query Adoptium API for the latest JRE release
-    api_url = (
-        f"{ADOPTIUM_API}/assets/latest/{JAVA_VERSION}/hotspot"
-        f"?architecture={arch}&image_type=jre&os={os_name}&vendor=eclipse"
-    )
-    req = urllib.request.Request(api_url, headers={"User-Agent": "RevoMC/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        releases = json.loads(r.read())
+    # Try JRE first, then JDK as fallback (some versions don't have standalone JRE)
+    release = None
+    for image_type in ("jre", "jdk"):
+        try:
+            api_url = (
+                f"{ADOPTIUM_API}/assets/latest/{java_version}/hotspot"
+                f"?architecture={arch}&image_type={image_type}&os={os_name}&vendor=eclipse"
+            )
+            req = urllib.request.Request(api_url, headers={"User-Agent": "RevoMC/1.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                releases = json.loads(r.read())
+            if releases:
+                release = releases[0]
+                break
+        except Exception:
+            continue
 
-    if not releases:
+    if not release:
         raise RuntimeError(
-            f"No Java {JAVA_VERSION} JRE found for {os_name}/{arch} on Adoptium."
+            f"No Java {java_version} runtime found for {os_name}/{arch} on Adoptium."
         )
 
-    release = releases[0]
     binary = release["binary"]
     pkg = binary["package"]
     dl_url = pkg["link"]
     filename = pkg["name"]
     dest = runtime_dir / filename
 
-    log(f"⬇  Downloading Java {JAVA_VERSION} JRE ({filename})…")
-    log(f"   This is a one-time download (~50 MB).")
+    log(f"⬇  Downloading Java {java_version} ({image_type.upper()}: {filename})…")
+    log(f"   This is a one-time download.")
 
     req = urllib.request.Request(dl_url, headers={"User-Agent": "RevoMC/1.0"})
     with urllib.request.urlopen(req, timeout=120) as r:
@@ -151,4 +201,4 @@ def install_java(log: Callable, progress: Callable) -> None:
     if platform.system() != "Windows":
         exe.chmod(0o755)
 
-    log(f"✅ Java {JAVA_VERSION} ready at: {exe}")
+    log(f"✅ Java {java_version} ready at: {exe}")

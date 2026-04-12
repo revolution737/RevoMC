@@ -31,4 +31,7 @@ Thumbs.db
 pat.txt
 
 #Build tester
-build_windows.bat
+builds/*.exe
+builds/*.app
+builds/RevoMC
+builds/RevoMC/

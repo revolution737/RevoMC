@@ -25,6 +25,7 @@ DEFAULTS = {
     "profiles": [],
     "active_profile": None,
     "installed_versions": {},
+    "first_run": True,
 }
 
 # Profile structure:

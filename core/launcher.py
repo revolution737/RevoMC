@@ -15,11 +15,12 @@ from core.installer import get_launcher_dir, get_mods_dir
 from core.config import get_minecraft_dir
 
 
-from core.java_manager import get_java_executable
+from core.java_manager import get_java_executable, get_required_java_version
 
 
-def _find_java() -> str:
-    return get_java_executable()
+def _find_java(mc_version: str) -> str:
+    java_version = get_required_java_version(mc_version)
+    return get_java_executable(java_version)
 
 
 def _maven_path(name: str) -> str:
@@ -82,7 +83,7 @@ def launch(
     game_dir = get_minecraft_dir()
     game_dir.mkdir(parents=True, exist_ok=True)
 
-    java = _find_java()
+    java = _find_java(mc_version)
     sep = ";" if platform.system() == "Windows" else ":"
 
     # Load vanilla version JSON
