@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from core.installer import get_launcher_dir, get_mods_dir
-from core.config import get_minecraft_dir
+from core.config import get_minecraft_dir, get_assets_dir
 
 
 from core.java_manager import get_java_executable, get_required_java_version
@@ -130,7 +130,7 @@ def launch(
 
     # Asset index
     asset_index_id = version_json["assetIndex"]["id"]
-    assets_dir = base / "assets"
+    assets_dir = get_assets_dir()
 
     # JVM args from Fabric profile
     extra_jvm = []

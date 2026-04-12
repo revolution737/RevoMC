@@ -22,6 +22,8 @@ from typing import Callable, Optional
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 
+from core.config import get_assets_dir
+
 # ── Mod registry ─────────────────────────────────────────────────────────────
 AVAILABLE_MODS = {
     "sodium": {
@@ -212,47 +214,54 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
 
     # Asset index
     asset_index = version_json["assetIndex"]
-    idx_dir = base / "assets" / "indexes"
+    assets_dir = get_assets_dir()
+    idx_dir = assets_dir / "indexes"
     idx_dir.mkdir(parents=True, exist_ok=True)
     idx_file = idx_dir / f"{asset_index['id']}.json"
     if not idx_file.exists():
         log("🎨 Downloading asset index…")
         _download(asset_index["url"], idx_file)
+    else:
+        log("✅ Asset index already present.")
 
     # Assets
-    log("🎨 Downloading assets…")
+    log("🎨 Checking assets…")
     objects = json.loads(idx_file.read_text())["objects"]
-    obj_dir = base / "assets" / "objects"
+    obj_dir = assets_dir / "objects"
     missing = {
         name: info
         for name, info in objects.items()
         if not (obj_dir / info["hash"][:2] / info["hash"]).exists()
     }
-    log(
-        f"   {len(objects) - len(missing)}/{len(objects)} assets cached, downloading {len(missing)}…"
-    )
 
-    done_count = [0]
-    lock = threading.Lock()
+    if not missing:
+        log(f"✅ All {len(objects)} assets already cached, skipping download.")
+    else:
+        log(
+            f"   {len(objects) - len(missing)}/{len(objects)} assets cached, downloading {len(missing)}…"
+        )
 
-    def download_asset(item):
-        name, info = item
-        h = info["hash"]
-        dest = obj_dir / h[:2] / h
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if not dest.exists():
-            _download(f"https://resources.download.minecraft.net/{h[:2]}/{h}", dest)
-        with lock:
-            done_count[0] += 1
-            if done_count[0] % 100 == 0:
-                log(f"   …{done_count[0]}/{len(missing)} assets")
-            progress("assets", int(done_count[0] / max(len(missing), 1) * 100))
+        done_count = [0]
+        lock = threading.Lock()
 
-    if missing:
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            list(executor.map(download_asset, missing.items()))
+        def download_asset(item):
+            name, info = item
+            h = info["hash"]
+            dest = obj_dir / h[:2] / h
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                _download(f"https://resources.download.minecraft.net/{h[:2]}/{h}", dest)
+            with lock:
+                done_count[0] += 1
+                if done_count[0] % 100 == 0:
+                    log(f"   …{done_count[0]}/{len(missing)} assets")
+                progress("assets", int(done_count[0] / max(len(missing), 1) * 100))
 
-    log(f"✅ Assets ready ({len(objects)} files).")
+        if missing:
+            with ThreadPoolExecutor(max_workers=16) as executor:
+                list(executor.map(download_asset, missing.items()))
+
+        log(f"✅ Assets ready ({len(objects)} files).")
     log("🧩 Extracting native libraries…")
     _extract_natives(version_json, base, mc_version, log)
     return version_json

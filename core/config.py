@@ -19,6 +19,11 @@ def get_minecraft_dir() -> Path:
         return Path.home() / ".minecraft"
 
 
+def get_assets_dir() -> Path:
+    """Get the standard Minecraft assets directory, shared across all launchers."""
+    return get_minecraft_dir() / "assets"
+
+
 DEFAULTS = {
     "username": "",
     "ram_gb": 2,
