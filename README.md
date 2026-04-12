@@ -13,7 +13,7 @@ RevoMC is simply as good as vanilla Minecraft gets.
 - 🟢 Iris Shaders (shader pack support)
 - 🟢 Lithium (server-side logic optimisation)
 - 🟢 FerriteCore (RAM usage reduction)
-- 🟢 Auto-downloads Java 21 — no manual Java install needed
+- 🟢 Auto-downloads Java (Java 8/21/25 based on MC version) — no manual Java install needed
 - 🟢 Picks the latest compatible mod version for whatever MC version you choose
 - 🟢 Multiple profiles — run vanilla and modded side by side
 - 🟢 Per-profile mod toggles — enable or disable individual mods per profile
@@ -74,7 +74,7 @@ python main.py
 2. Click **+ New** to create a profile — pick a name, type (Vanilla or Fabric+Mods), version, and which mods to include
 3. **Adjust RAM** — 2–4 GB is fine for modded play
 4. Click **⬇ Install / Update** — this downloads:
-   - Java 21 runtime (first time only, ~50 MB)
+   - Java runtime (first time only, ~50 MB)
    - Minecraft client jar + libraries + assets (~300 MB first time)
    - Fabric loader (if Fabric profile)
    - Selected mods from Modrinth (if Fabric profile)
@@ -93,17 +93,16 @@ RevoMC/
 │   ├── config.py         # Saves your settings
 │   └── java_manager.py   # Auto-downloads and manages Java runtime
 └── ui/
-    └── main_window.py    # PyQt6 UI
+    └── main_window.py    # CustomTkinter UI
 ```
 
-All game files are stored in `~/.revomc/` and your worlds/saves live in the standard `.minecraft` folder:
+RevoMC stores launcher data in `~/.revomc/` and shares game files with the standard `.minecraft` folder:
 ```
 ~/.revomc/
 ├── config.json
-├── runtime/              # Bundled Java 21 JRE (auto-downloaded)
-├── versions/             # Vanilla + Fabric profiles
-├── libraries/            # Shared JARs
-├── assets/               # Game assets (sounds, textures)
+├── runtime/              # Bundled Java JRE (auto-downloaded based on MC version)
+├── versions/             # Vanilla + Fabric version profiles
+├── libraries/            # Shared JARs for Minecraft and Fabric
 └── mods/                 # Downloaded mods per MC version
     └── 1.21.1/
         ├── sodium-*.jar
@@ -111,7 +110,8 @@ All game files are stored in `~/.revomc/` and your worlds/saves live in the stan
         ├── lithium-*.jar
         └── ferritecore-*.jar
 
-~/.minecraft/             # Your actual game data — same as the official launcher
+~/.minecraft/             # Shared with other Minecraft launchers — same as the official launcher
+├── assets/               # Game assets (sounds, textures) — shared across all launchers
 ├── saves/                # Your worlds
 ├── screenshots/
 ├── resourcepacks/
