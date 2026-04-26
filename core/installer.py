@@ -24,6 +24,8 @@ from typing import Callable, Optional
 from concurrent.futures import ThreadPoolExecutor
 import urllib.request
 
+from core.config import get_assets_dir
+
 # ── Mod registry ─────────────────────────────────────────────────────────────
 AVAILABLE_MODS = {
     "sodium": {
@@ -232,9 +234,11 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
     if not idx_file.exists():
         log("🎨 Downloading asset index…")
         _download(asset_index["url"], idx_file)
+    else:
+        log("✅ Asset index already present.")
 
     # Assets
-    log("🎨 Downloading assets…")
+    log("🎨 Checking assets…")
     objects = json.loads(idx_file.read_text())["objects"]
     obj_dir = shared_assets_dir / "objects"
     missing = {
@@ -242,7 +246,6 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
         for name, info in objects.items()
         if not (obj_dir / info["hash"][:2] / info["hash"]).exists()
     }
-    
     if not missing:
         log(f"✅ All {len(objects)} assets already cached, skipping download.")
         progress("assets", 100)
@@ -268,10 +271,10 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
                 progress("assets", int(done_count[0] / max(len(missing), 1) * 100))
 
         if missing:
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            list(executor.map(download_asset, missing.items()))
+            with ThreadPoolExecutor(max_workers=16) as executor:
+                list(executor.map(download_asset, missing.items()))
 
-    log(f"✅ Assets ready ({len(objects)} files).")
+        log(f"✅ Assets ready ({len(objects)} files).")
     log("🧩 Extracting native libraries…")
     _extract_natives(version_json, base, mc_version, log)
     return version_json
