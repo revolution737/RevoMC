@@ -26,7 +26,7 @@ pyz = PYZ(a.pure)
 if sys.platform == 'darwin':
     exe = EXE(pyz, a.scripts, [], exclude_binaries=True,
               name='RevoMC', debug=False, strip=True, upx=False,
-              console=False, windowed=True)
+              console=False, windowed=True, target_arch='universal2')
     coll = COLLECT(exe, a.binaries, a.datas, strip=True, upx=False, name='RevoMC')
     app = BUNDLE(coll, name='RevoMC.app',
                  bundle_identifier='com.revomc.launcher',

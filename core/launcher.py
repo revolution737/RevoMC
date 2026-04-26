@@ -34,6 +34,8 @@ def _collect_classpath(
 ) -> list[str]:
     libs_dir = base / "libraries"
     sys_name = platform.system().lower()
+    if sys_name == "darwin":
+        sys_name = "osx"
     jars = []
 
     def add_libs(lib_list):

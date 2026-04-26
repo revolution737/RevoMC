@@ -130,8 +130,10 @@ def _extract_natives(version_json: dict, base: Path, mc_version: str, log: Calla
     natives_dir.mkdir(parents=True, exist_ok=True)
     libs_dir = base / "libraries"
     sys_name = platform.system().lower()
+    if sys_name == "darwin":
+        sys_name = "osx"
     native_key = {
-        "darwin": "natives-macos",
+        "osx": "natives-macos",
         "windows": "natives-windows",
         "linux": "natives-linux",
     }.get(sys_name)
@@ -189,6 +191,8 @@ def install_minecraft(mc_version: str, log: Callable, progress: Callable) -> dic
     log("📚 Downloading vanilla libraries…")
     libs_dir = base / "libraries"
     sys_name = platform.system().lower()
+    if sys_name == "darwin":
+        sys_name = "osx"
     to_download = []
     for lib in version_json.get("libraries", []):
         rules = lib.get("rules", [])
