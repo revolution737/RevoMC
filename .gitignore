@@ -30,6 +30,9 @@ Thumbs.db
 #PAT
 pat.txt
 
+#txt
+UPDATE VERSION IN updater.py!.txt
+
 #Build tester
 builds/*.exe
 builds/*.exe.old
