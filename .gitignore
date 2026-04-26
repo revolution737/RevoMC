@@ -32,6 +32,7 @@ pat.txt
 
 #Build tester
 builds/*.exe
+builds/*.exe.old
 builds/*.app
 builds/RevoMC
 builds/RevoMC/

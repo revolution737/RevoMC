@@ -8,6 +8,7 @@ a = Analysis(
     datas=collect_data_files('customtkinter'),
     hiddenimports=[
         'customtkinter',
+        'core.updater',
         'core.installer',
         'core.launcher',
         'core.config',

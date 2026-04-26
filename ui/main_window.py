@@ -268,6 +268,8 @@ class MainWindow(ctk.CTk):
     # ── Java check (same as original) ─────────────────────────────────────────
 
     def _check_java(self):
+        from core.updater import CURRENT_VERSION
+        self._log(f"🚀 RevoMC Launcher Version: {CURRENT_VERSION}")
         self._log("☕ Java runtimes are downloaded on demand (Java 8 / 21 / 25).")
 
     # ── UI Construction ───────────────────────────────────────────────────────
