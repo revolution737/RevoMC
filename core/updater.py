@@ -149,7 +149,7 @@ def check_and_update():
                 with open(sh_path, "w") as f:
                     f.write(f'#!/bin/bash\n')
                     f.write(f'sleep 2\n')
-                    f.write(f'cp -r "{os.path.join(extract_dir, "RevoMC")}/*" "{os.path.dirname(current_exe)}/"\n')
+                    f.write(f'cp -a "{os.path.join(extract_dir, "RevoMC")}/." "{os.path.dirname(current_exe)}/"\n')
                     f.write(f'chmod +x "{current_exe}"\n')
                     f.write(f'"{current_exe}" &\n')
                     f.write(f'rm "$0"\n')
