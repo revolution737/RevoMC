@@ -72,23 +72,19 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    container: fedora:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-tk
+          dnf update -y
+          dnf install -y python3 python3-pip python3-tkinter zip gcc python3-devel
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          pip install customtkinter certifi pyinstaller
+          python3 -m pip install customtkinter certifi pyinstaller
 
       - name: Build app
         run: |
