@@ -26,4 +26,12 @@ echo "Building RevoMC..."
 pyinstaller revomc.spec --clean --distpath builds/
 
 echo ""
-echo "Build complete. The app bundle is located in the 'builds' folder."
+echo "Running smoke test on the built app bundle..."
+builds/RevoMC.app/Contents/MacOS/RevoMC --smoke-test
+if [ $? -ne 0 ]; then
+    echo "Error: Smoke test failed. The build is broken and missing modules."
+    exit 1
+fi
+
+echo ""
+echo "Build complete and validated! The app bundle is located in the 'builds' folder."

@@ -26,5 +26,14 @@ echo Building RevoMC...
 pyinstaller revomc.spec --clean --distpath builds/
 
 echo.
-echo Build complete. The executable is located in the 'builds' folder.
+echo Running smoke test on the built executable...
+builds\RevoMC.exe --smoke-test
+if %errorlevel% neq 0 (
+    echo Error: Smoke test failed. The build is broken and missing modules.
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
+echo Build complete and validated! The executable is located in the 'builds' folder.
 pause

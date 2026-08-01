@@ -122,6 +122,16 @@ def check_and_update():
                 new_exe = os.path.join(extract_dir, "RevoMC.exe")
                 if not os.path.exists(new_exe):
                     raise Exception("RevoMC.exe not found in downloaded zip.")
+                
+                # Validate the new binary
+                tk.Label(progress_win, text="Validating new version...").pack()
+                progress_win.update_idletasks()
+                try:
+                    res = subprocess.run([new_exe, "--smoke-test"], capture_output=True, text=True)
+                    if res.returncode != 0:
+                        raise Exception(f"Smoke test failed:\n{res.stdout}\n{res.stderr}")
+                except Exception as e:
+                    raise Exception(f"Downloaded binary is broken, aborting update.\nDetails: {e}")
                     
                 old_exe = current_exe + ".old"
                 if os.path.exists(old_exe):
@@ -145,6 +155,17 @@ def check_and_update():
                 if not os.path.exists(new_exe):
                     raise Exception("RevoMC executable not found in downloaded zip.")
                 
+                # Validate the new binary
+                tk.Label(progress_win, text="Validating new version...").pack()
+                progress_win.update_idletasks()
+                os.chmod(new_exe, 0o755)
+                try:
+                    res = subprocess.run([new_exe, "--smoke-test"], capture_output=True, text=True)
+                    if res.returncode != 0:
+                        raise Exception(f"Smoke test failed:\n{res.stdout}\n{res.stderr}")
+                except Exception as e:
+                    raise Exception(f"Downloaded binary is broken, aborting update.\nDetails: {e}")
+                
                 sh_path = os.path.join(temp_dir, "update.sh")
                 with open(sh_path, "w") as f:
                     f.write(f'#!/bin/bash\n')
@@ -165,6 +186,18 @@ def check_and_update():
                 new_app = os.path.join(extract_dir, "RevoMC.app")
                 if not os.path.exists(new_app):
                     raise Exception("RevoMC.app not found in downloaded zip.")
+                
+                # Validate the new binary
+                tk.Label(progress_win, text="Validating new version...").pack()
+                progress_win.update_idletasks()
+                mac_exe = os.path.join(new_app, "Contents", "MacOS", "RevoMC")
+                os.chmod(mac_exe, 0o755)
+                try:
+                    res = subprocess.run([mac_exe, "--smoke-test"], capture_output=True, text=True)
+                    if res.returncode != 0:
+                        raise Exception(f"Smoke test failed:\n{res.stdout}\n{res.stderr}")
+                except Exception as e:
+                    raise Exception(f"Downloaded binary is broken, aborting update.\nDetails: {e}")
                 
                 sh_path = os.path.join(temp_dir, "update.sh")
                 with open(sh_path, "w") as f:

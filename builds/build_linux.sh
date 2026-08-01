@@ -30,5 +30,12 @@ pip install -r requirements.txt requests pyinstaller
 echo "Building RevoMC..."
 pyinstaller revomc.spec --clean --distpath builds/
 
+echo "Running smoke test on the built executable..."
+builds/RevoMC/RevoMC --smoke-test
+if [ $? -ne 0 ]; then
+    echo "Error: Smoke test failed. The build is broken and missing modules."
+    exit 1
+fi
+
 echo ""
-echo "Build complete. The executable is located in the 'builds' folder."
+echo "Build complete and validated! The executable is located in the 'builds' folder."
