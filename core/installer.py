@@ -27,13 +27,20 @@ import urllib.request
 from core.config import get_assets_dir
 
 # ── Mod registry ─────────────────────────────────────────────────────────────
+# Order matters: mods that declare pinned dependencies on other mods in this
+# list must come FIRST so their pins are recorded before the pinned mod is
+# fetched.  Iris pins a specific Sodium version → Iris resolves before Sodium.
 AVAILABLE_MODS = {
+    "iris": {
+        "id": "YL57xq9U",
+        "label": "Iris Shaders",
+        "desc": "Shader pack support",
+    },
     "sodium": {
         "id": "AANobbMI",
         "label": "Sodium",
         "desc": "High performance renderer",
     },
-    "iris": {"id": "YL57xq9U", "label": "Iris Shaders", "desc": "Shader pack support"},
     "lithium": {
         "id": "gvQqBUqZ",
         "label": "Lithium",
@@ -325,20 +332,57 @@ def install_fabric(mc_version: str, log: Callable, progress: Callable) -> str:
     return profile_id
 
 
+# ── Project-ID → AVAILABLE_MODS key reverse lookup ───────────────────────────
+# Built at import time so _install_single_mod can tag deps by their registry key.
+_PROJECT_ID_TO_KEY: dict[str, str] = {v["id"]: k for k, v in AVAILABLE_MODS.items()}
+# Include Fabric API so its deps are also tracked.
+_PROJECT_ID_TO_KEY[FABRIC_API_ID] = "fabric-api"
+
+
 def _install_single_mod(
-    name: str, project_id: str, mc_version: str, mods_dir: Path, log: Callable
-) -> list[str]:
-    """Download all files for one mod. Returns filenames installed."""
-    url = (
-        f"{MODRINTH_API}/project/{project_id}/version"
-        f"?game_versions=%5B%22{mc_version}%22%5D&loaders=%5B%22fabric%22%5D"
-    )
-    versions = _get(url)
-    if not versions:
-        log(f"⚠  No {name} release found for {mc_version} — skipping.")
-        return []
-    ver = versions[0]
-    installed = []
+    name: str,
+    project_id: str,
+    mc_version: str,
+    mods_dir: Path,
+    log: Callable,
+    pinned_version_id: Optional[str] = None,
+) -> tuple[list[str], dict[str, str]]:
+    """Download all files for one mod.
+
+    Returns:
+        (installed_filenames, pinned_deps)
+
+        pinned_deps maps AVAILABLE_MODS key → Modrinth version_id for every
+        *required* dependency this mod version declares.  The caller uses these
+        to constrain the versions fetched for mods installed later.
+    """
+    if pinned_version_id:
+        # A peer mod already told us exactly which version of this mod to use.
+        ver = _get(f"{MODRINTH_API}/version/{pinned_version_id}")
+    else:
+        url = (
+            f"{MODRINTH_API}/project/{project_id}/version"
+            f"?game_versions=%5B%22{mc_version}%22%5D&loaders=%5B%22fabric%22%5D"
+        )
+        versions = _get(url)
+        if not versions:
+            log(f"⚠  No {name} release found for {mc_version} — skipping.")
+            return [], {}
+        ver = versions[0]
+
+    # Collect required dependency pins declared by this version so callers can
+    # honour them when installing the dependent mods afterwards.
+    pinned_deps: dict[str, str] = {}
+    for dep in ver.get("dependencies", []):
+        if dep.get("dependency_type") != "required":
+            continue
+        dep_version_id = dep.get("version_id")
+        dep_project_id = dep.get("project_id", "")
+        if dep_version_id and dep_project_id in _PROJECT_ID_TO_KEY:
+            key = _PROJECT_ID_TO_KEY[dep_project_id]
+            pinned_deps[key] = dep_version_id
+
+    installed: list[str] = []
     for file_info in ver["files"]:
         dest = mods_dir / file_info["filename"]
         if dest.exists():
@@ -347,14 +391,18 @@ def _install_single_mod(
             log(f"⬇  Downloading {file_info['filename']} ({ver['version_number']})…")
             _download(file_info["url"], dest)
         installed.append(file_info["filename"])
-    return installed
+    return installed, pinned_deps
 
 
 def install_mods(
     mc_version: str, enabled_mods: list[str], log: Callable, progress: Callable
 ) -> list[str]:
-    """
-    Download Fabric API + enabled mods from Modrinth.
+    """Download Fabric API + enabled mods from Modrinth.
+
+    Resolves mods in AVAILABLE_MODS order (dependency-first) and propagates
+    pinned version constraints so that if Mod A requires a specific version of
+    Mod B, Mod B is installed at that exact version rather than newest-first.
+
     enabled_mods is a list of keys from AVAILABLE_MODS e.g. ["sodium", "iris"]
     """
     mods_dir = get_mods_dir(mc_version)
@@ -363,26 +411,43 @@ def install_mods(
     for f in mods_dir.glob("*.jar"):
         f.unlink()
 
-    installed = []
+    # Maps AVAILABLE_MODS key → pinned Modrinth version_id.
+    # Populated as each mod is installed; consulted before fetching the next.
+    version_pins: dict[str, str] = {}
+    installed: list[str] = []
 
     log("🔍 Resolving fabric-api…")
     try:
-        installed += _install_single_mod(
+        files, deps = _install_single_mod(
             "fabric-api", FABRIC_API_ID, mc_version, mods_dir, log
         )
+        installed += files
+        version_pins.update(deps)
     except Exception as e:
         log(f"❌ Failed to install fabric-api: {e}")
 
-    total = len(enabled_mods)
-    for i, mod_key in enumerate(enabled_mods):
-        if mod_key not in AVAILABLE_MODS:
-            continue
+    # Iterate in AVAILABLE_MODS insertion order (dependency-declaring mods first)
+    # but only install mods the user actually enabled.
+    ordered_keys = [k for k in AVAILABLE_MODS if k in enabled_mods]
+    total = len(ordered_keys)
+
+    for i, mod_key in enumerate(ordered_keys):
         mod = AVAILABLE_MODS[mod_key]
-        log(f"🔍 Resolving {mod['label']} for MC {mc_version}…")
+        pin = version_pins.get(mod_key)  # set by a previously installed peer
+        if pin:
+            log(f"🔍 Resolving {mod['label']} for MC {mc_version} (pinned by dependency)…")
+        else:
+            log(f"🔍 Resolving {mod['label']} for MC {mc_version}…")
         try:
-            installed += _install_single_mod(
-                mod_key, mod["id"], mc_version, mods_dir, log
+            files, deps = _install_single_mod(
+                mod_key, mod["id"], mc_version, mods_dir, log,
+                pinned_version_id=pin,
             )
+            installed += files
+            # Propagate any new pins this mod declares for mods not yet installed.
+            for dep_key, dep_ver_id in deps.items():
+                if dep_key not in version_pins:
+                    version_pins[dep_key] = dep_ver_id
         except Exception as e:
             log(f"❌ Failed to install {mod['label']}: {e}")
         progress("mods", int((i + 1) / max(total, 1) * 100))

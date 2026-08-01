@@ -13,6 +13,8 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 import core.config as config
+import core.auth as auth
+from ui.theme import get_theme
 from core.installer import (
     fetch_release_versions,
     fetch_fabric_versions,
@@ -29,18 +31,22 @@ from core.java_manager import get_required_java_version
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
-# Colour tokens (matching the original palette)
-BG_PRIMARY   = "#1a1a2e"
-BG_SECONDARY = "#16213e"
-BG_CONSOLE   = "#0f0f1a"
-BORDER_COL   = "#2d3748"
-GREEN        = "#4ade80"
-GREEN_DARK   = "#22c55e"
-BLUE         = "#60a5fa"
-RED          = "#f87171"
-TEXT_FG      = "#e0e0e0"
-TEXT_MUTED   = "#9ca3af"
-TEXT_LABEL   = "#6b7280"
+# Colour tokens — loaded from the active theme at module level (defaults).
+# MainWindow.__init__ reloads from config and _apply_theme() updates live.
+_t = get_theme(config.load().get("theme", "overworld"))
+BG_PRIMARY   = _t["BG_PRIMARY"]
+BG_SECONDARY = _t["BG_SECONDARY"]
+BG_CONSOLE   = _t["BG_CONSOLE"]
+BORDER_COL   = _t["BORDER_COL"]
+GREEN        = _t["ACCENT"]
+GREEN_DARK   = _t["ACCENT_DARK"]
+BLUE         = _t["ACCENT_ALT"]
+RED          = _t["RED"]
+MS_BLUE      = _t["MS_BLUE"]
+MS_BLUE_DARK = _t["MS_BLUE_DARK"]
+TEXT_FG      = _t["TEXT_FG"]
+TEXT_MUTED   = _t["TEXT_MUTED"]
+TEXT_LABEL   = _t["TEXT_LABEL"]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -250,20 +256,100 @@ class NewProfileDialog(ctk.CTkToplevel):
         self.destroy()
 
 
+# ── Settings Dialog ────────────────────────────────────────────────────────────
+
+class SettingsDialog(ctk.CTkToplevel):
+    """Modal dialog for launcher settings (theme, dGPU, etc.)."""
+
+    def __init__(self, parent, theme: dict, cfg: dict):
+        super().__init__(parent)
+        self.theme = theme
+        self.cfg = cfg
+        self.result = False  # True if theme changed
+
+        self.title("Settings")
+        self.geometry("400x320")
+        self.resizable(False, False)
+        self.transient(parent)
+
+        self._build()
+        self.update_idletasks()
+        self.after(200, self.grab_set)
+        self.wait_window(self)
+
+    def _build(self):
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=20)
+
+        _section_label(body, "Theme").pack(anchor="w", pady=(0, 10))
+        self.theme_var = ctk.StringVar(value=self.cfg.get("theme", "overworld"))
+
+        themes_frame = ctk.CTkFrame(body, fg_color="transparent")
+        themes_frame.pack(fill="x", pady=(0, 20))
+
+        for t_val, t_name, t_icon in [("overworld", "Overworld", "🌲"), ("nether", "Nether", "🔥"), ("end", "End", "🌌")]:
+            ctk.CTkRadioButton(
+                themes_frame, text=f"{t_icon} {t_name}",
+                variable=self.theme_var, value=t_val,
+                text_color=self.theme["TEXT_FG"],
+                fg_color=self.theme["ACCENT"],
+                hover_color=self.theme["ACCENT_DARK"],
+            ).pack(side="left", padx=(0, 15))
+
+        _section_label(body, "Performance").pack(anchor="w", pady=(0, 10))
+        self.dgpu_var = ctk.BooleanVar(value=self.cfg.get("use_dgpu", False))
+        ctk.CTkCheckBox(
+            body, text="Run on Discrete GPU (NVIDIA/AMD)  —  Linux & Windows",
+            variable=self.dgpu_var,
+            text_color=self.theme["TEXT_FG"],
+            hover_color=self.theme["ACCENT_DARK"],
+            fg_color=self.theme["ACCENT"],
+        ).pack(anchor="w")
+
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.pack(side="bottom", fill="x", padx=20, pady=12)
+        ctk.CTkButton(
+            btn_row, text="Cancel", fg_color="transparent",
+            border_width=1, border_color=self.theme["BORDER_COL"],
+            text_color=self.theme["TEXT_FG"],
+            command=self.destroy,
+        ).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(
+            btn_row, text="Save", fg_color=self.theme["ACCENT"],
+            text_color=self.theme["BG_PRIMARY"],
+            hover_color=self.theme["ACCENT_DARK"],
+            command=self._on_save,
+        ).pack(side="right")
+
+    def _on_save(self):
+        old_theme = self.cfg.get("theme", "overworld")
+        new_theme = self.theme_var.get()
+        self.cfg["theme"] = new_theme
+        self.cfg["use_dgpu"] = self.dgpu_var.get()
+        config.save(self.cfg)
+        if old_theme != new_theme:
+            self.result = True
+        self.destroy()
+
+
 # ── Main Window ───────────────────────────────────────────────────────────────
+
 
 class MainWindow(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.cfg              = config.load()
+        self.theme            = get_theme(self.cfg.get("theme", "overworld"))
         self.all_versions: list[str]    = []
         self.fabric_versions: list[str] = []
         self._busy            = False
         self._selected_profile_idx: int = -1
+        self._ms_account: dict | None = None
 
         self._setup_ui()
         self._check_java()
         self._load_versions()
+        self._try_restore_session()
 
     # ── Java check (same as original) ─────────────────────────────────────────
 
@@ -288,11 +374,12 @@ class MainWindow(ctk.CTk):
         header.pack(fill="x", pady=(0, 12))
 
         # Title block
-        ctk.CTkLabel(
+        self.title_lbl = ctk.CTkLabel(
             header, text="⛏  RevoMC",
             font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=GREEN,
-        ).pack(side="left", anchor="s")
+            text_color=self.theme["ACCENT"],
+        )
+        self.title_lbl.pack(side="left", anchor="s")
         ctk.CTkLabel(
             header,
             text="   Fabric enabled, performance optimised launcher for Minecraft",
@@ -300,16 +387,65 @@ class MainWindow(ctk.CTk):
             text_color=TEXT_LABEL,
         ).pack(side="left", anchor="s", pady=(0, 3))
 
-        # Username block (right side)
-        user_block = ctk.CTkFrame(header, fg_color="transparent")
-        user_block.pack(side="right", anchor="s")
-        _section_label(user_block, "Username").pack(anchor="w")
+        # Auth block (right side)
+        auth_block = ctk.CTkFrame(header, fg_color="transparent")
+        auth_block.pack(side="right", anchor="s")
+
+        # Auth mode toggle
+        mode_row = ctk.CTkFrame(auth_block, fg_color="transparent")
+        mode_row.pack(anchor="e", pady=(0, 4))
+        _section_label(mode_row, "Account").pack(side="left", padx=(0, 8))
+        self.auth_mode_var = ctk.StringVar(value=self.cfg.get("auth_mode", "offline"))
+        self.auth_mode_menu = ctk.CTkSegmentedButton(
+            mode_row,
+            values=["Offline", "Microsoft"],
+            variable=self.auth_mode_var,
+            command=self._on_auth_mode_changed,
+            font=ctk.CTkFont(size=11),
+            selected_color=GREEN,
+            selected_hover_color=GREEN_DARK,
+            unselected_color=BG_SECONDARY,
+            unselected_hover_color="#1e293b",
+        )
+        self.auth_mode_menu.pack(side="left")
+        self.auth_mode_var.set(self.cfg.get("auth_mode", "offline").title())
+
+        # Offline panel: username entry
+        self.offline_panel = ctk.CTkFrame(auth_block, fg_color="transparent")
         self.username_var = ctk.StringVar(value=self.cfg.get("username", ""))
         self.username_var.trace_add("write", self._on_username_changed)
         ctk.CTkEntry(
-            user_block, textvariable=self.username_var,
-            placeholder_text="Enter username…", width=200,
-        ).pack()
+            self.offline_panel, textvariable=self.username_var,
+            placeholder_text="Enter username…", width=220,
+        ).pack(side="left")
+
+        # Microsoft panel: sign-in button / account label
+        self.ms_panel = ctk.CTkFrame(auth_block, fg_color="transparent")
+        self.ms_signin_btn = ctk.CTkButton(
+            self.ms_panel, text="  Sign in with Microsoft",
+            fg_color=MS_BLUE, hover_color=MS_BLUE_DARK,
+            text_color="#ffffff",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            width=220, height=32,
+            command=self._on_ms_signin,
+        )
+        self.ms_loggedin_frame = ctk.CTkFrame(self.ms_panel, fg_color="transparent")
+        self.ms_gamertag_lbl = ctk.CTkLabel(
+            self.ms_loggedin_frame, text="",
+            text_color=self.theme["ACCENT"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        self.ms_gamertag_lbl.pack(side="left", padx=(0, 8))
+        self.ms_signout_btn = ctk.CTkButton(
+            self.ms_loggedin_frame, text="Sign Out",
+            fg_color="transparent", border_width=1, border_color=BORDER_COL,
+            text_color=TEXT_MUTED, hover_color=BG_SECONDARY,
+            width=72, height=28,
+            font=ctk.CTkFont(size=11),
+            command=self._on_ms_signout,
+        )
+        self.ms_signout_btn.pack(side="left")
+        self._refresh_auth_panel()
 
         # Divider
         ctk.CTkFrame(root, height=1, fg_color=BORDER_COL).pack(fill="x", pady=(0, 14))
@@ -333,6 +469,13 @@ class MainWindow(ctk.CTk):
         ph = ctk.CTkFrame(left, fg_color="transparent")
         ph.pack(fill="x", pady=(0, 6))
         _section_label(ph, "Profiles").pack(side="left")
+        self.settings_btn = ctk.CTkButton(
+            ph, text="⚙ Settings", width=90,
+            fg_color="transparent", border_width=1, border_color=TEXT_MUTED,
+            text_color=TEXT_MUTED, hover_color=BG_SECONDARY,
+            command=self._on_open_settings,
+        )
+        self.settings_btn.pack(side="right", padx=(6, 0))
         self.del_btn = ctk.CTkButton(
             ph, text="Delete", width=72,
             fg_color="transparent", border_width=1, border_color=RED,
@@ -445,6 +588,7 @@ class MainWindow(ctk.CTk):
                 self.after(0, lambda: self._log(f"❌ Could not fetch Fabric versions: {e}"))
 
             self.after(0, self._maybe_create_default_profiles)
+            self.after(0, self._auto_update_latest_profiles)
             self.after(0, self._refresh_buttons)
 
         threading.Thread(target=_task, daemon=True).start()
@@ -493,6 +637,70 @@ class MainWindow(ctk.CTk):
             self.cfg["first_run"] = False
             config.save(self.cfg)
 
+    def _auto_update_latest_profiles(self):
+        """Silently keep 'Latest Release' profiles on the newest MC version.
+
+        Runs every startup after version lists are fetched.
+        - If a Latest Release profile exists but is stale, update its mc_version.
+        - If a Latest Release profile was deleted, re-create it only when a
+          genuinely NEW MC version has dropped since it was last seen.
+        - Completely silent: no console output, no user notifications.
+        """
+        if not self.all_versions:
+            return  # no version data available (offline?)
+
+        latest_vanilla = self.all_versions[0]
+        latest_fabric  = self.fabric_versions[0] if self.fabric_versions else None
+        profiles       = self.cfg.setdefault("profiles", [])
+        changed        = False
+
+        # ── Vanilla ───────────────────────────────────────────────────────────
+        vanilla_profile    = next((p for p in profiles if p["name"] == "Latest Release Vanilla"), None)
+        prev_known_vanilla = self.cfg.get("last_known_latest_vanilla")
+
+        if vanilla_profile:
+            if vanilla_profile["mc_version"] != latest_vanilla:
+                vanilla_profile["mc_version"] = latest_vanilla
+                changed = True
+        else:
+            # Only re-create when a NEW version has appeared since last seen
+            if latest_vanilla != prev_known_vanilla:
+                profiles.append({
+                    "name": "Latest Release Vanilla",
+                    "mc_version": latest_vanilla,
+                    "type": "vanilla",
+                    "mods": [],
+                })
+                changed = True
+
+        self.cfg["last_known_latest_vanilla"] = latest_vanilla
+
+        # ── Fabric ────────────────────────────────────────────────────────────
+        if latest_fabric:
+            fabric_profile    = next((p for p in profiles if p["name"] == "Latest Release Fabric"), None)
+            prev_known_fabric = self.cfg.get("last_known_latest_fabric")
+
+            if fabric_profile:
+                if fabric_profile["mc_version"] != latest_fabric:
+                    fabric_profile["mc_version"] = latest_fabric
+                    changed = True
+            else:
+                if latest_fabric != prev_known_fabric:
+                    profiles.append({
+                        "name": "Latest Release Fabric",
+                        "mc_version": latest_fabric,
+                        "type": "fabric",
+                        "mods": list(AVAILABLE_MODS.keys()),
+                    })
+                    changed = True
+
+            self.cfg["last_known_latest_fabric"] = latest_fabric
+
+        # ── Persist ───────────────────────────────────────────────────────────
+        config.save(self.cfg)  # always persist the tracking keys
+        if changed:
+            self._refresh_profile_list()
+
     # ── Profiles ──────────────────────────────────────────────────────────────
 
     def _refresh_profile_list(self):
@@ -507,14 +715,15 @@ class MainWindow(ctk.CTk):
         for i, p in enumerate(profiles):
             type_tag = "🟢 Fabric" if p["type"] == "fabric" else "🍦 Vanilla"
             label    = f"{p['name']}\n{p['mc_version']}  ·  {type_tag}"
+            is_active = p["name"] == active
 
             btn = ctk.CTkButton(
                 self.profile_list_frame,
                 text=label,
                 anchor="w",
-                fg_color=GREEN if p["name"] == active else BG_SECONDARY,
-                text_color=BG_PRIMARY if p["name"] == active else TEXT_FG,
-                hover_color=GREEN_DARK if p["name"] == active else "#1e293b",
+                fg_color=self.theme["ACCENT"] if is_active else self.theme["BG_SECONDARY"],
+                text_color=self.theme["BG_PRIMARY"] if is_active else self.theme["TEXT_FG"],
+                hover_color=self.theme["ACCENT_DARK"] if is_active else "#1e293b",
                 font=ctk.CTkFont(size=12),
                 command=lambda idx=i: self._on_profile_selected(idx),
             )
@@ -545,9 +754,9 @@ class MainWindow(ctk.CTk):
             # Recolour buttons
             for i, btn in enumerate(self._profile_buttons):
                 if i == idx:
-                    btn.configure(fg_color=GREEN, text_color=BG_PRIMARY, hover_color=GREEN_DARK)
+                    btn.configure(fg_color=self.theme["ACCENT"], text_color=self.theme["BG_PRIMARY"], hover_color=self.theme["ACCENT_DARK"])
                 else:
-                    btn.configure(fg_color=BG_SECONDARY, text_color=TEXT_FG, hover_color="#1e293b")
+                    btn.configure(fg_color=self.theme["BG_SECONDARY"], text_color=self.theme["TEXT_FG"], hover_color="#1e293b")
         self._refresh_buttons()
 
     def _update_info_card(self, profile: dict):
@@ -612,15 +821,27 @@ class MainWindow(ctk.CTk):
         profile = self._current_profile()
         if not profile:
             return
-        username = self.username_var.get().strip()
-        if not username:
-            self._log("⚠  Please enter a username before playing.")
-            return
+
+        is_ms = self.auth_mode_var.get() == "Microsoft"
+        auth_data = None
+
+        if is_ms:
+            if not self._ms_account:
+                self._log("⚠  Please sign in with Microsoft before playing.")
+                return
+            username = self._ms_account["name"]
+            auth_data = self._ms_account
+        else:
+            username = self.username_var.get().strip()
+            if not username:
+                self._log("⚠  Please enter a username before playing.")
+                return
 
         mc_version   = profile["mc_version"]
         profile_type = profile["type"]
         enabled_mods = profile.get("mods", [])
         ram_gb       = self.ram_var.get()
+        use_dgpu     = self.cfg.get("use_dgpu", False)
         needs_install = not self._is_installed_for_profile(profile)
 
         self._set_busy(True)
@@ -634,7 +855,6 @@ class MainWindow(ctk.CTk):
             try:
                 fabric_profile_id = None
 
-                # ── Install phase (skipped if already up-to-date) ──────────
                 if needs_install:
                     from core.java_manager import install_java
                     java_ver = get_required_java_version(mc_version)
@@ -672,7 +892,6 @@ class MainWindow(ctk.CTk):
                         .get("fabric_profile_id")
                     )
 
-                # ── Launch phase ──────────────────────────────────────────
                 self.after(0, lambda: self._log("🚀 Starting game…"))
                 proc = launch(
                     mc_version=mc_version,
@@ -681,6 +900,8 @@ class MainWindow(ctk.CTk):
                     username=username,
                     ram_gb=ram_gb,
                     log=lambda m: self.after(0, lambda msg=m: self._log(msg)),
+                    auth_data=auth_data,
+                    use_dgpu=use_dgpu,
                 )
                 self.after(0, lambda: self._log("🎮 Game launched!"))
                 for line in proc.stdout:
@@ -711,20 +932,24 @@ class MainWindow(ctk.CTk):
 
     def _refresh_buttons(self):
         profile     = self._current_profile()
-        username    = self.username_var.get().strip()
         has_profile = profile is not None
         installed   = has_profile and self._is_installed_for_profile(profile)
 
-        # Button label changes based on install state
+        is_ms = self.auth_mode_var.get() == "Microsoft"
+        if is_ms:
+            has_identity = self._ms_account is not None
+        else:
+            has_identity = bool(self.username_var.get().strip())
+
         if not has_profile:
             btn_text  = "▶  PLAY"
             state_play = "disabled"
         elif not installed:
             btn_text  = "⬇  Install & Play"
-            state_play = "normal" if bool(username) else "disabled"
+            state_play = "normal" if has_identity else "disabled"
         else:
             btn_text  = "▶  PLAY"
-            state_play = "normal" if bool(username) else "disabled"
+            state_play = "normal" if has_identity else "disabled"
 
         self.play_btn.configure(text=btn_text, state=state_play)
         self.del_btn.configure(state="normal" if has_profile else "disabled")
@@ -753,3 +978,135 @@ class MainWindow(ctk.CTk):
         self.log_box.insert("end", text + "\n")
         self.log_box.configure(state="disabled")
         self.log_box.see("end")
+
+    # ── Settings & Theme ──────────────────────────────────────────────────────
+
+    def _on_open_settings(self):
+        dlg = SettingsDialog(self, self.theme, self.cfg)
+        if dlg.result:
+            self.theme = get_theme(self.cfg.get("theme", "overworld"))
+            self._apply_theme()
+
+    def _apply_theme(self):
+        t = self.theme
+        self.configure(fg_color=t["BG_PRIMARY"])
+        self.title_lbl.configure(text_color=t["ACCENT"])
+        self.ms_gamertag_lbl.configure(text_color=t["ACCENT"])
+        self.auth_mode_menu.configure(
+            selected_color=t["ACCENT"], selected_hover_color=t["ACCENT_DARK"],
+            unselected_color=t["BG_SECONDARY"],
+        )
+        self.ms_signin_btn.configure(fg_color=t["MS_BLUE"], hover_color=t["MS_BLUE_DARK"])
+        self.profile_list_frame.configure(fg_color=t["BG_SECONDARY"], border_color=t["BORDER_COL"])
+        self.info_card.configure(fg_color=t["BG_SECONDARY"], border_color=t["BORDER_COL"])
+        self.ram_slider.configure(
+            progress_color=t["ACCENT"], fg_color=t["BG_SECONDARY"],
+            button_color=t["ACCENT"], button_hover_color=t["ACCENT_DARK"],
+        )
+        self.play_btn.configure(
+            fg_color=t["ACCENT"], text_color=t["BG_PRIMARY"], hover_color=t["ACCENT_DARK"],
+        )
+        self.log_box.configure(fg_color=t["BG_CONSOLE"], border_color=t["BORDER_COL"])
+        self.progress_bar.configure(progress_color=t["ACCENT"], fg_color=t["BG_SECONDARY"])
+        self.new_btn.configure(
+            border_color=t["ACCENT_ALT"], text_color=t["ACCENT_ALT"], hover_color=t["ACCENT_ALT"],
+        )
+        self._refresh_profile_list()
+
+    # ── Microsoft Auth UI ─────────────────────────────────────────────────────
+
+    def _on_auth_mode_changed(self, value: str):
+        # Always store lowercase so _try_restore_session comparison is consistent
+        mode = value.lower()
+        self.cfg["auth_mode"] = mode
+        config.save(self.cfg)
+        self._refresh_auth_panel()
+        self._refresh_buttons()
+
+    def _refresh_auth_panel(self):
+        is_ms = self.auth_mode_var.get().lower() == "microsoft"
+        if is_ms:
+            self.offline_panel.pack_forget()
+            self.ms_panel.pack(anchor="e")
+            self._refresh_ms_state()
+        else:
+            self.ms_panel.pack_forget()
+            self.offline_panel.pack(anchor="e")
+
+    def _refresh_ms_state(self):
+        if self._ms_account:
+            self.ms_signin_btn.pack_forget()
+            self.ms_loggedin_frame.pack(anchor="e")
+            self.ms_gamertag_lbl.configure(text=f"🟢  {self._ms_account['name']}")
+        else:
+            self.ms_loggedin_frame.pack_forget()
+            self.ms_signin_btn.pack(anchor="e")
+            self.ms_signin_btn.configure(text="  Sign in with Microsoft", state="normal")
+
+    def _on_ms_signin(self):
+        self.ms_signin_btn.configure(text="  Waiting for browser…", state="disabled")
+        self._log(f"\n{'─'*40}")
+
+        def on_success(login_data: dict):
+            def _update():
+                self._ms_account = login_data
+                self._refresh_auth_panel()
+                self._refresh_buttons()
+            self.after(0, _update)
+
+        def on_error(message: str):
+            def _update():
+                self._log(f"❌ {message}")
+                self._refresh_ms_state()
+                self._refresh_buttons()
+            self.after(0, _update)
+
+        auth.start_login(
+            log=lambda m: self.after(0, lambda msg=m: self._log(msg)),
+            on_success=on_success,
+            on_error=on_error,
+        )
+
+    def _on_ms_signout(self):
+        auth.logout(log=self._log)
+        self._ms_account = None
+        self._refresh_auth_panel()
+        self._refresh_buttons()
+
+    def _try_restore_session(self):
+        # Normalize stored auth_mode — could be "microsoft" or "Microsoft"
+        # depending on whether it was saved by the toggle or by _save_account()
+        stored_mode = self.cfg.get("auth_mode", "offline").lower()
+        if stored_mode != "microsoft":
+            return
+        account = auth.get_stored_account()
+        if not account:
+            # auth_mode says microsoft but no account stored — reset to offline
+            self.cfg["auth_mode"] = "offline"
+            config.save(self.cfg)
+            self.after(0, lambda: self.auth_mode_var.set("Offline"))
+            self.after(0, self._refresh_auth_panel)
+            return
+
+        def _task():
+            refreshed = auth.try_refresh(
+                log=lambda m: self.after(0, lambda msg=m: self._log(msg)),
+            )
+            if refreshed:
+                def _update():
+                    self._ms_account = refreshed
+                    self._refresh_auth_panel()
+                    self._refresh_buttons()
+                self.after(0, _update)
+            else:
+                # Refresh failed — reset auth_mode to offline so the UI
+                # is consistent and the user knows they need to sign in again
+                def _update():
+                    self.cfg["auth_mode"] = "offline"
+                    config.save(self.cfg)
+                    self.auth_mode_var.set("Offline")
+                    self._refresh_auth_panel()
+                    self._refresh_buttons()
+                self.after(0, _update)
+
+        threading.Thread(target=_task, daemon=True).start()

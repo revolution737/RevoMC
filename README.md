@@ -126,7 +126,8 @@ RevoMC stores launcher data in `~/.revomc/` and shares game files with the stand
 
 ## Notes
 
-- **This uses offline auth** (no Microsoft login). You need a legitimate Minecraft account to play on online-mode servers. For offline/LAN play it works fine as-is.
+- **Microsoft login is supported** — switch to "Microsoft" mode in the launcher header and sign in with your Microsoft account to play on online-mode servers. Your session persists between launches via refresh tokens.
+- **Offline mode still works** — if you don't have a Microsoft account or prefer LAN/offline play, use "Offline" mode with any username.
 - Mod downloads use the [Modrinth](https://modrinth.com) API. Occasionally their servers may drop a connection mid-download — if this happens just hit **Install / Update** again to retry.
 
 ---

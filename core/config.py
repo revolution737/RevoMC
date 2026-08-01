@@ -31,6 +31,12 @@ DEFAULTS = {
     "active_profile": None,
     "installed_versions": {},
     "first_run": True,
+    "auth_mode": "offline",        # "offline" or "microsoft"
+    "ms_account": None,            # {name, id, access_token, refresh_token}
+    "use_dgpu": True,
+    "theme": "overworld",
+    "last_known_latest_vanilla": None,
+    "last_known_latest_fabric": None,
 }
 
 # Profile structure:

@@ -6,6 +6,7 @@ Builds the JVM classpath and launches Minecraft, with or without Fabric.
 import os
 import json
 import shutil
+from core.auth import CLIENT_ID
 import subprocess
 import platform
 from pathlib import Path
@@ -21,6 +22,29 @@ from core.java_manager import get_java_executable, get_required_java_version
 def _find_java(mc_version: str) -> str:
     java_version = get_required_java_version(mc_version)
     return get_java_executable(java_version)
+
+
+def _set_windows_gpu_preference(java_path: str, log: Callable) -> None:
+    r"""
+    Register the Java executable for 'High Performance' GPU rendering
+    via the Windows Graphics Settings registry key.
+
+    HKCU\Software\Microsoft\DirectX\UserGpuPreferences
+    Value: <java_path> = "GpuPreference=2;"
+      0 = let Windows decide, 1 = power saving, 2 = high performance
+
+    No admin elevation required -- this writes to HKEY_CURRENT_USER.
+    """
+    import winreg
+    key_path = r"Software\Microsoft\DirectX\UserGpuPreferences"
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, key_path,
+            0, winreg.KEY_SET_VALUE
+        ) as key:
+            winreg.SetValueEx(key, java_path, 0, winreg.REG_SZ, "GpuPreference=2;")
+    except Exception as e:
+        log(f"⚠  Could not set GPU preference in registry: {e}")
 
 
 def _maven_path(name: str) -> str:
@@ -80,6 +104,8 @@ def launch(
     username: str,
     ram_gb: int,
     log: Callable,
+    auth_data: dict | None = None,
+    use_dgpu: bool = False,
 ) -> subprocess.Popen:
     base = get_launcher_dir()
     game_dir = get_minecraft_dir()
@@ -156,13 +182,13 @@ def launch(
         "${game_directory}": str(game_dir),
         "${assets_root}": str(assets_dir),
         "${assets_index_name}": asset_index_id,
-        "${auth_uuid}": "00000000-0000-0000-0000-000000000000",
-        "${auth_access_token}": "0",
-        "${user_type}": "legacy",
+        "${auth_uuid}": auth_data["id"] if auth_data else "00000000-0000-0000-0000-000000000000",
+        "${auth_access_token}": auth_data["access_token"] if auth_data else "0",
+        "${user_type}": "msa" if auth_data else "legacy",
         "${version_type}": "release",
         "${resolution_width}": "854",
         "${resolution_height}": "480",
-        "${clientid}": "0",
+        "${clientid}": CLIENT_ID if auth_data else "0",
         "${auth_xuid}": "0",
     }
 
@@ -186,11 +212,11 @@ def launch(
             "--assetIndex",
             asset_index_id,
             "--uuid",
-            "00000000-0000-0000-0000-000000000000",
+            auth_data["id"] if auth_data else "00000000-0000-0000-0000-000000000000",
             "--accessToken",
-            "0",
+            auth_data["access_token"] if auth_data else "0",
             "--userType",
-            "legacy",
+            "msa" if auth_data else "legacy",
         ]
 
     natives_path = base / "versions" / mc_version / "natives"
@@ -221,11 +247,24 @@ def launch(
     log(f"   Game dir:   {game_dir}")
     log(f"   RAM:        {ram_gb}GB")
 
+    env = os.environ.copy()
+    if use_dgpu:
+        system = platform.system()
+        if system == "Linux":
+            env["__NV_PRIME_RENDER_OFFLOAD"] = "1"
+            env["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia"
+            env["DRI_PRIME"] = "1"
+            log("🎮 Running with Discrete GPU enabled (Linux)")
+        elif system == "Windows":
+            _set_windows_gpu_preference(java, log)
+            log("🎮 Running with Discrete GPU enabled (Windows)")
+
     popen_kwargs = dict(
         cwd=str(game_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        env=env,
     )
 
     if platform.system() == "Windows":
