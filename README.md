@@ -17,7 +17,7 @@ RevoMC is simply as good as vanilla Minecraft gets.
 - 🟢 Lithium (server-side logic optimisation)
 - 🟢 FerriteCore (RAM usage reduction)
 - 🟢 Auto-downloads Java (Java 8/21/25 based on MC version) — no manual Java install needed
-- 🟢 Picks the latest compatible mod version for whatever MC version you choose
+- 🟢 Dedicated GPU Support: Automatically enables dGPU mode on hybrid graphics systems (Windows Registry & Linux Prime)
 - 🟢 Multiple profiles — run vanilla and modded side by side
 - 🟢 Per-profile mod toggles — enable or disable individual mods per profile
 - 🟢 Vanilla profiles support all MC versions including the latest
@@ -25,6 +25,7 @@ RevoMC is simply as good as vanilla Minecraft gets.
 - 🟢 Automatic retry on failed downloads
 - 🟢 Configurable RAM allocation
 - 🟢 Console log so you can see exactly what's happening
+- 🟢 Safe Auto-Updater: Built-in self-updating mechanism that verifies new binaries before replacing them
 - 🟢 Available for Windows, macOS, and Linux
 
 ---
@@ -88,12 +89,15 @@ python main.py
 ## File Structure
 ```
 RevoMC/
-├── main.py               # Entry point
+├── main.py               # Entry point (includes pre-release smoke testing)
 ├── requirements.txt
+├── revomc.spec           # PyInstaller build spec with auto-dependency collection
 ├── core/
-│   ├── installer.py      # Downloads MC, Fabric, mods
-│   ├── launcher.py       # Builds JVM args and launches the game
-│   ├── config.py         # Saves your settings
+│   ├── installer.py      # Dependency-aware downloader for MC, Fabric, and mods
+│   ├── launcher.py       # Builds JVM args, dGPU environment, and launches the game
+│   ├── config.py         # Saves your settings and tracks profile versions
+│   ├── updater.py        # Safe self-updater using GitHub releases
+│   ├── auth.py           # Microsoft OAuth2 PKCE login flow
 │   └── java_manager.py   # Auto-downloads and manages Java runtime
 └── ui/
     └── main_window.py    # CustomTkinter UI
@@ -128,6 +132,8 @@ RevoMC stores launcher data in `~/.revomc/` and shares game files with the stand
 
 - **Microsoft login is supported** — switch to "Microsoft" mode in the launcher header and sign in with your Microsoft account to play on online-mode servers. Your session persists between launches via refresh tokens.
 - **Offline mode still works** — if you don't have a Microsoft account or prefer LAN/offline play, use "Offline" mode with any username.
+- **Dedicated GPU (dGPU) mode** — enabled by default on systems with hybrid graphics. On Windows, it sets a registry key (`HKCU\Software\Microsoft\DirectX\UserGpuPreferences`) to tell Windows to run the Java runtime on your high-performance GPU. On Linux, it uses the `DRI_PRIME=1` environment variable.
+- **Safe Auto-Updates** — RevoMC checks GitHub for launcher updates and safely installs them by downloading to a temporary directory and running a smoke-test on the new binary. If the new binary is missing libraries or corrupt, the update automatically aborts without breaking your currently installed version.
 - Mod downloads use the [Modrinth](https://modrinth.com) API. Occasionally their servers may drop a connection mid-download — if this happens just hit **Install / Update** again to retry.
 
 ---
