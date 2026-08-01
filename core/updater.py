@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import tempfile
 
-CURRENT_VERSION = "v1.0.7.8"
+CURRENT_VERSION = "v1.0.8"
 REPO_URL = "https://api.github.com/repos/revolution737/RevoMC/releases/latest"
 
 def parse_version(v):
