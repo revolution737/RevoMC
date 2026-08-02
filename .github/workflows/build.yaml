@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install customtkinter certifi pyinstaller
+          pip install -r requirements.txt pyinstaller
 
       - name: Build exe
         run: |
@@ -52,7 +52,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install customtkinter certifi pyinstaller
+          pip install -r requirements.txt pyinstaller
 
       - name: Build app
         run: |
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python3 -m pip install customtkinter certifi pyinstaller
+          python3 -m pip install -r requirements.txt pyinstaller
 
       - name: Build app
         run: |
