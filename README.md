@@ -4,7 +4,9 @@ A custom, lightweight Minecraft Java launcher that auto-installs **Sodium**, **I
 
 RevoMC is simply as good as vanilla Minecraft gets.
 
-<img width="1914" height="1323" alt="image" src="https://github.com/user-attachments/assets/f135d491-def4-4457-b33a-2c6b4bdf0fd4" />
+<img width="2018" height="1492" alt="image" src="https://github.com/user-attachments/assets/09829429-8c4c-4a16-a8aa-db97e608f1b5" />
+
+
 
 
 ---
